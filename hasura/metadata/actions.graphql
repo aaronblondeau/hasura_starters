@@ -1,0 +1,63 @@
+type Mutation {
+  changePassword (
+    old_password: String!
+    new_password: String!
+  ): ChangePasswordOutput
+}
+
+type Mutation {
+  destroyUser (
+    password: String!
+  ): DestroyUserOutput
+}
+
+type Mutation {
+  login (
+    email: String!
+    password: String!
+  ): LoginOutput
+}
+
+type Mutation {
+  register (
+    password: String!
+    email: String!
+  ): RegisterOutput
+}
+
+type Mutation {
+  resetPassword (
+    email: String!
+  ): ResetPasswordOutput
+}
+
+type Query {
+  whoami : WhoamiOutput
+}
+
+type RegisterOutput {
+  id : Int!
+  token : String!
+}
+
+type WhoamiOutput {
+  id : Int!
+}
+
+type LoginOutput {
+  token : String!
+  id : Int!
+}
+
+type ChangePasswordOutput {
+  password_at : String!
+}
+
+type ResetPasswordOutput {
+  success : Boolean!
+}
+
+type DestroyUserOutput {
+  success : Boolean!
+}
+

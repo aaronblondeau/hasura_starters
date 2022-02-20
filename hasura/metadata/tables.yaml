@@ -1,0 +1,45 @@
+- table:
+    schema: public
+    name: users
+  select_permissions:
+  - role: user
+    permission:
+      columns:
+      - created_at
+      - email
+      - email_verified
+      - id
+      filter:
+        id:
+          _eq: x-hasura-user-id
+  update_permissions:
+  - role: user
+    permission:
+      columns:
+      - email
+      filter:
+        id:
+          _eq: x-hasura-user-id
+      check: null
+  event_triggers:
+  - name: users_insert
+    definition:
+      enable_manual: false
+      insert:
+        columns: '*'
+    retry_conf:
+      num_retries: 0
+      interval_sec: 10
+      timeout_sec: 60
+    webhook_from_env: EVENTS_WEBHOOK_URL
+  - name: users_update_email
+    definition:
+      enable_manual: false
+      update:
+        columns:
+        - email
+    retry_conf:
+      num_retries: 0
+      interval_sec: 10
+      timeout_sec: 60
+    webhook_from_env: EVENTS_WEBHOOK_URL
