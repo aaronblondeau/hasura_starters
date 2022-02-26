@@ -135,6 +135,7 @@ yarn hasura metadata apply --project ../hasura
 Then run the console for day to day development:
 
 ``` Console Startup
+cd node
 export HASURA_GRAPHQL_ADMIN_SECRET=mydevsecret
 yarn hasura console --project ../hasura
 ```
@@ -142,6 +143,7 @@ yarn hasura console --project ../hasura
 On windows:
 
 ```Windows
+cd node
 $env:HASURA_GRAPHQL_ADMIN_SECRET = 'mydevsecret'
 yarn hasura console --project ../hasura
 ```
