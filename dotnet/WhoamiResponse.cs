@@ -1,5 +1,4 @@
 namespace HasuraStarter;
-using System.Text.Json.Serialization;
 
 public class WhoamiResponse
 {

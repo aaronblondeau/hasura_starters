@@ -37,9 +37,11 @@ public class AuthController : ControllerBase
             }
         }
 
-        Console.WriteLine("~~ Got token " + token);
+        // Console.WriteLine("~~ Got token " + token);
 
-        return new AuthResponse("user", 1.ToString());
+        // return new AuthResponse("user", 1.ToString());
+
+        return new AuthResponse("public", "");
     }
 
     [HttpGet(Name = "GetAuth")]
