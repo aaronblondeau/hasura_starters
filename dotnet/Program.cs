@@ -14,6 +14,7 @@ builder.Services.AddSwaggerGen();
 // https://stackoverflow.com/questions/69532898/asp-net-core-6-0-kestrel-server-is-not-working
 builder.WebHost.ConfigureKestrel(options =>
 {
+    // TODO this only seems to work with "dotnet watch", and not "dotnet run"
     // options.ListenLocalhost(Int32.Parse(System.Environment.GetEnvironmentVariable("PORT") ?? "3000"));
     // TODO this is needed for Hasura to be able to call endpoint from docker
     options.ListenAnyIP(Int32.Parse(System.Environment.GetEnvironmentVariable("PORT") ?? "3000")); // to listen for incoming http connection on port 5001

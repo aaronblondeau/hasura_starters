@@ -1,11 +1,11 @@
 namespace HasuraStarter;
 
-public class RegisterResponse
+public class LoginRegisterResponse
 {
-    public string id { get; set; }
+    public int id { get; set; }
     public string token { get; set; }
 
-    public RegisterResponse(string id, string token) {
+    public LoginRegisterResponse(int id, string token) {
         this.id = id;
         this.token = token;
     }

@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
+using System.Text.Json;
 
 namespace HasuraStarter.Controllers;
 
@@ -14,7 +15,13 @@ public class AuthController : ControllerBase
         _logger = logger;
     }
 
-    private AuthResponse Authenticate(AuthRequest? authBody) {
+    private IActionResult Authenticate(AuthRequest? authBody) {
+        string jwtSecret = Environment.GetEnvironmentVariable("JWT_SECRET") ?? string.Empty;
+        if (jwtSecret == string.Empty)
+        {
+            return StatusCode(StatusCodes.Status400BadRequest, new { message = "Authentication action is not properly configured!" });
+        }
+
         string token = String.Empty;
 
         // Look in Body
@@ -37,21 +44,27 @@ public class AuthController : ControllerBase
             }
         }
 
-        // Console.WriteLine("~~ Got token " + token);
+        string? userIdStr = AuthCrypt.GetUserIdFromToken(token, jwtSecret);
+        if (userIdStr != null)
+        {
+            if (Int32.TryParse(userIdStr, out int userId))
+            {
+                // TODO - load user and check for changed password
 
-        // return new AuthResponse("user", 1.ToString());
-
-        return new AuthResponse("public", "");
+                return Ok(new AuthResponse("user", userId + ""));
+            }
+        }
+        return Ok(new AuthResponse("public", ""));
     }
 
     [HttpGet(Name = "GetAuth")]
-    public AuthResponse Get()
+    public IActionResult Get()
     {
         return Authenticate(null);
     }
 
     [HttpPost(Name = "PostAuth")]
-    public AuthResponse Post([FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] AuthRequest? authRequest)
+    public IActionResult Post([FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] AuthRequest? authRequest)
     {
         return Authenticate(authRequest);
     }

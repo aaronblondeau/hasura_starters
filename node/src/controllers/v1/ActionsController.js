@@ -17,7 +17,7 @@ async function register (req, res) {
     if (_.has(req, 'body.input.email')) {
       email = req.body.input.email
     } else {
-      return res.status(400).send({ message: 'email is required.' })
+      return res.status(400).send({ message: 'Email is required.' })
     }
     // Always handle emails in lowercase on the backend
     email = email.toLowerCase()
