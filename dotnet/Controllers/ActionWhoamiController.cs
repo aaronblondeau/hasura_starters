@@ -29,7 +29,7 @@ public class ActionWhoamiController : ControllerBase
             token = authHeader.Replace("Bearer ", "");
         }
 
-        string? userIdStr = AuthCrypt.GetUserIdFromToken(token, jwtSecret);
+        (string? userIdStr, _) = AuthCrypt.GetUserIdAndIatFromToken(token, jwtSecret);
         if (userIdStr != null)
         {
             return Ok(new WhoamiResponse(userIdStr));

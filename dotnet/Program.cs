@@ -38,4 +38,7 @@ app.UseAuthorization();
 
 app.MapControllers();
 
+Console.WriteLine("~~ Connecting to cache...");
+HasuraStarter.Cache.Instance.Connect();
+
 app.Run();

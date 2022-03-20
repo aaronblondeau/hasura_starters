@@ -9,6 +9,12 @@ public class AuthResponse
     [JsonPropertyName("x-hasura-user-id")]
     public string xHasuraUserId { get; set; }
 
+    public AuthResponse()
+    {
+        xHasuraRole = String.Empty;
+        xHasuraUserId = String.Empty;
+    }
+
     public AuthResponse(string role, string userId) {
         xHasuraRole = role;
         xHasuraUserId = userId;

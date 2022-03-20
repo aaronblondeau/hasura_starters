@@ -27,6 +27,7 @@ public class AuthCrypt
             { "x-hasura-allowed-roles", new string[] {"user"} },
             { "x-hasura-default-role", "user" },
             { "x-hasura-user-id", userId + "" },
+            { "iat", DateTimeOffset.Now.ToUnixTimeSeconds() },
             // { "exp", DateTimeOffset.UtcNow.AddHours(1).ToUnixTimeSeconds()}
         };
 
@@ -39,7 +40,7 @@ public class AuthCrypt
         return token;
     }
 
-    public static string? GetUserIdFromToken(string token, string secret)
+    public static (string?, DateTime) GetUserIdAndIatFromToken(string token, string secret)
     {
         token = token.Replace("Bearer ", "");
         string decodedToken = DecodeToken(token, secret);
@@ -47,12 +48,16 @@ public class AuthCrypt
         {
             var decodedTokenJson = JsonDocument.Parse(decodedToken);
             string userIdStr = decodedTokenJson.RootElement.GetProperty("x-hasura-user-id").GetString() ?? "";
+
+            Int32 iatTimestamp = decodedTokenJson.RootElement.GetProperty("iat").GetInt32();
+            DateTime iat = DateTimeOffset.FromUnixTimeSeconds(iatTimestamp).UtcDateTime;
+
             if (userIdStr.Length > 0)
             {
-                return userIdStr;
+                return (userIdStr, iat);
             }
         }
-        return null;
+        return (null, DateTime.Now);
     }
 
     public static string DecodeToken(string token, string secret)

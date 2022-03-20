@@ -51,12 +51,12 @@ docker run --rm -d \
 
 On Windows:
 ```
-docker run --rm -d ^
-  --name local-postgres ^
-  -p 5432:5432 ^
-  -e POSTGRES_PASSWORD=pgadmin ^
-  -e PGDATA=/var/lib/postgresql/data/pgdata ^
-  -v ~/Volumes/hasura_starters:/var/lib/postgresql/data ^
+docker run --rm -d `
+  --name postgres `
+  -p 5432:5432 `
+  -e POSTGRES_PASSWORD=pgadmin `
+  -e PGDATA=/var/lib/postgresql/data/pgdata `
+  -v C:\Users\ablon\Volumes\hasura_starters:/var/lib/postgresql/data `
   postgis/postgis
 ```
 
@@ -89,15 +89,15 @@ docker run --rm -d -p 8000:8000 \
 
 On Windows:
 ```
-docker run --rm -d -p 8000:8000 ^
-  -e HASURA_GRAPHQL_SERVER_PORT=8000 ^
-  -e HASURA_GRAPHQL_DATABASE_URL=postgres://postgres:pgadmin@localhost:5432/hasura_starters ^
-  -e HASURA_GRAPHQL_ENABLE_CONSOLE=false ^
-  -e HASURA_GRAPHQL_ADMIN_SECRET=mydevsecret ^
-  -e HASURA_GRAPHQL_AUTH_HOOK=http://172.17.0.1:3000/hasura/auth ^
-  -e ACTIONS_BASE_URL=http://172.17.0.1:3000/hasura/actions ^
-  -e EVENTS_WEBHOOK_URL=http://172.17.0.1:3000/hasura/events ^
-  -e HASURA_GRAPHQL_CORS_DOMAIN=* ^
+docker run --rm -d -p 8000:8000 `
+  -e HASURA_GRAPHQL_SERVER_PORT=8000 `
+  -e HASURA_GRAPHQL_DATABASE_URL=postgres://postgres:pgadmin@host.docker.internal:5432/hasura_starters `
+  -e HASURA_GRAPHQL_ENABLE_CONSOLE=false `
+  -e HASURA_GRAPHQL_ADMIN_SECRET=mydevsecret `
+  -e HASURA_GRAPHQL_AUTH_HOOK=http://host.docker.internal:3000/hasura/auth `
+  -e ACTIONS_BASE_URL=http://host.docker.internal:3000/hasura/actions `
+  -e EVENTS_WEBHOOK_URL=http://host.docker.internal:3000/hasura/events `
+  -e HASURA_GRAPHQL_CORS_DOMAIN=* `
   hasura/graphql-engine:latest
 ```
 
