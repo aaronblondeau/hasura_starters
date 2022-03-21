@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 
 public class AuthResponse
 {
-     [JsonPropertyName("x-hasura-role")]
+    [JsonPropertyName("x-hasura-role")]
     public string xHasuraRole { get; set; }
 
     [JsonPropertyName("x-hasura-user-id")]

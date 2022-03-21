@@ -4,6 +4,8 @@ const { default: axios } = require('axios')
 const emailValidator = require('email-validator')
 const { generateToken, getUserFromTokenWithPassword, hashPassword, comparePasswords, getUserIdFromToken, getUserByEmail, generateRandomToken, updateUserPassword } = require('../../auth')
 const sendPasswordResetEmailJob = require('../../jobs/v1/send_password_reset_email')
+const { redisCache } = require('../../cache')
+const { DateTime } = require('luxon')
 
 const router = express.Router()
 
@@ -48,6 +50,7 @@ async function register (req, res) {
         returning {
           id
           password
+          password_at
         }
       }
     }
@@ -56,13 +59,13 @@ async function register (req, res) {
       'x-hasura-admin-secret': process.env.HASURA_GRAPHQL_ADMIN_SECRET
     }})
     if (createUserResponse.data.errors) {
-      throw new Error(response.data.errors[0].message)
+      throw new Error(createUserResponse.data.errors[0].message)
     }
 
     const user = createUserResponse.data.data.insert_users.returning[0]
 
     // Generate token for user
-    const token = generateToken(user.id)
+    const token = generateToken(user.id, Math.ceil(DateTime.fromISO(user.password_at).toJSDate().getTime() / 1000))
 
     return res.send({ id: user.id, token })
   } catch (error) {
@@ -188,6 +191,9 @@ async function destroyUser (req, res) {
 
     const user = await getUserFromTokenWithPassword(token, password)
     if (user) {
+      await redisCache.del('auth/user/' + user.id)
+      // TODO - must all delete all x-requested-role keys as well!
+
       const destroyUserResponse = await axios.post((process.env.HASURA_BASE_URL || 'http://localhost:8000') + '/v1/graphql', {query: 
       `
       mutation DeleteUser {

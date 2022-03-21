@@ -24,6 +24,9 @@ public class AuthController : ControllerBase
 
         string token = String.Empty;
 
+        // This action looks in multiple places for the token so that we can authenticate
+        // via methods other than just a Hasura action:
+
         // Look in Body
         if (authBody is not null && authBody.token is not null) {
             token = authBody.token;
@@ -50,10 +53,11 @@ public class AuthController : ControllerBase
             if (Int32.TryParse(userIdStr, out int userId))
             {
                 string cacheKey = "auth/user/" + userIdStr;
-                if (Request.Headers.TryGetValue("x-requested-role", out var role))
-                {
-                    cacheKey = cacheKey + ":" + role;
-                }
+                // TODO - if using role requests (IMPORTANT - see also cache clear in changePassword action if implemented!)
+                // if (Request.Headers.TryGetValue("x-requested-role", out var role))
+                // {
+                //     cacheKey = cacheKey + ":" + role;
+                // }
 
                 bool useCache = true;
                 if (Environment.GetEnvironmentVariable("DISABLE_AUTH_CACHE") == "yes")
@@ -68,7 +72,6 @@ public class AuthController : ControllerBase
                 if (!string.IsNullOrEmpty(cached))
                 {
                     AuthResponse? cachedResponse = JsonSerializer.Deserialize<AuthResponse>(cached);
-                    // TODO convert to AuthResponse and return it
                     if (cachedResponse != null)
                     {
                         return Ok(cachedResponse);
@@ -76,45 +79,27 @@ public class AuthController : ControllerBase
                 }
 
                 // Load user and ensure that password has not changed since the token was generated
-
-                HttpClient hasuraClient = new HttpClient();
-                hasuraClient.DefaultRequestHeaders.Add("x-hasura-admin-secret", Environment.GetEnvironmentVariable("HASURA_GRAPHQL_ADMIN_SECRET"));
-
-                var userResponse = await hasuraClient.PostAsync((Environment.GetEnvironmentVariable("HASURA_BASE_URL") ?? "http://localhost:8000") + "/v1/graphql", new StringContent(JsonSerializer.Serialize(new
+                try
                 {
-                    operationName = "GetUser",
-                    query = $@"query GetUser {{
-                        users_by_pk(id: {userId}) {{
-                          id
-                          password_at
-                        }}
-                    }}",
-                    // variables = null
-                }), System.Text.Encoding.UTF8, "application/json"));
-                var userResponseBody = await userResponse.Content.ReadAsStringAsync();
-                var user = JsonDocument.Parse(userResponseBody);
+                    User user = await UserGraphQL.GetUserById(userId);
 
-                if (user.RootElement.TryGetProperty("errors", out JsonElement errors))
+                    DateTime passwordAt = DateTime.Parse(user.passwordAt ?? "").ToUniversalTime();
+                    if (tokenIat < passwordAt.AddSeconds(-10))
+                    {
+                        return StatusCode(StatusCodes.Status401Unauthorized, new { message = "Token has been invalidated!" });
+                    }
+
+                    AuthResponse response = new AuthResponse("user", userId + "");
+                    if (useCache)
+                    {
+                        await Cache.Instance.Set(cacheKey, JsonSerializer.Serialize<AuthResponse>(response));
+                    }
+                    return Ok(response);
+
+                } catch (Exception ex)
                 {
-                    string errorMessage = errors[0].GetProperty("message").GetString() ?? "Unknown error";
-                    return StatusCode(StatusCodes.Status400BadRequest, new { message = errorMessage });
+                    return StatusCode(StatusCodes.Status401Unauthorized, new { message = ex.Message });
                 }
-
-                string passwordAtStr = user.RootElement.GetProperty("data").GetProperty("users_by_pk").GetProperty("password_at").GetString() ?? "";
-
-                DateTime passwordAt = DateTime.Parse(passwordAtStr).ToUniversalTime();
-
-                if (passwordAt > tokenIat)
-                {
-                    return StatusCode(StatusCodes.Status400BadRequest, new { message = "Token has been invalidated!" });
-                }
-
-                AuthResponse response = new AuthResponse("user", userId + "");
-                if (useCache)
-                {
-                    await Cache.Instance.Set(cacheKey, JsonSerializer.Serialize<AuthResponse>(response));
-                }
-                return Ok(response);
             }
         }
         return Ok(new AuthResponse("public", ""));

@@ -48,4 +48,9 @@ public sealed class Cache
         string value = await db.StringGetAsync(key);
         return value;
     }
+
+    public async Task Del(string key)
+    {
+        await db.KeyDeleteAsync(key);
+    }
 }

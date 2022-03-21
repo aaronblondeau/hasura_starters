@@ -40,38 +40,19 @@ public class ActionLoginController : ControllerBase
         string email = registerRequest.input.email.ToLower();
         string password = registerRequest.input.password;
 
-        HttpClient hasuraClient = new HttpClient();
-        hasuraClient.DefaultRequestHeaders.Add("x-hasura-admin-secret", Environment.GetEnvironmentVariable("HASURA_GRAPHQL_ADMIN_SECRET"));
-
-        var userResponse = await hasuraClient.PostAsync((Environment.GetEnvironmentVariable("HASURA_BASE_URL") ?? "http://localhost:8000") + "/v1/graphql", new StringContent(JsonSerializer.Serialize(new
+        try
         {
-            operationName = "GetUserByEmail",
-            query = $@"query GetUserByEmail {{
-                users(where: {{email: {{_eq: ""{email}""}}}}) {{
-                  id
-                  password
-                }}
-            }}",
-            // variables = null
-        }), System.Text.Encoding.UTF8, "application/json"));
-        var userResponseBody = await userResponse.Content.ReadAsStringAsync();
-        var user = JsonDocument.Parse(userResponseBody);
-
-        if (user.RootElement.TryGetProperty("errors", out JsonElement errors))
-        {
-            string errorMessage = errors[0].GetProperty("message").GetString() ?? "Unknown error";
-            return StatusCode(StatusCodes.Status400BadRequest, new { message = errorMessage });
+            User user = await UserGraphQL.GetUserByEmail(email);
+            if (AuthCrypt.CheckPassword(password, user.password ?? ""))
+            {
+                string token = AuthCrypt.GenerateToken(user.id, jwtSecret);
+                return Ok(new LoginRegisterResponse(user.id, token));
+            }
+            return StatusCode(StatusCodes.Status400BadRequest, new { message = "email or password did not match!" });
         }
-
-        int id = user.RootElement.GetProperty("data").GetProperty("users")[0].GetProperty("id").GetInt32();
-        string hashedPassword = user.RootElement.GetProperty("data").GetProperty("users")[0].GetProperty("password").GetString() ?? "";
-
-        if (AuthCrypt.CheckPassword(password, hashedPassword))
+        catch (Exception ex)
         {
-            string token = AuthCrypt.GenerateToken(id, jwtSecret);
-            return Ok(new LoginRegisterResponse(id, token));
+            return StatusCode(StatusCodes.Status401Unauthorized, new { message = ex.Message });
         }
-
-        return StatusCode(StatusCodes.Status400BadRequest, new { message = "email or password did not match!" });
     }
 }

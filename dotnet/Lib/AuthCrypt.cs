@@ -11,7 +11,7 @@ public class AuthCrypt
 {
     public static string HashPassword(string password)
     {
-        return BCrypt.HashPassword(password);
+        return BCrypt.HashPassword(password, 10);
     }
 
     public static bool CheckPassword(string password, string hashedPassword)
@@ -20,14 +20,18 @@ public class AuthCrypt
     }
 
     // https://github.com/jwt-dotnet/jwt
-    public static string GenerateToken(int userId, string secret)
+    public static string GenerateToken(int userId, string secret, long iat = 0)
     {
+        if (iat == 0)
+        {
+            iat = DateTimeOffset.Now.ToUnixTimeSeconds();
+        }
         var payload = new Dictionary<string, object>
         {
             { "x-hasura-allowed-roles", new string[] {"user"} },
             { "x-hasura-default-role", "user" },
             { "x-hasura-user-id", userId + "" },
-            { "iat", DateTimeOffset.Now.ToUnixTimeSeconds() },
+            { "iat", iat },
             // { "exp", DateTimeOffset.UtcNow.AddHours(1).ToUnixTimeSeconds()}
         };
 

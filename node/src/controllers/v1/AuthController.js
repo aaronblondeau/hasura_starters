@@ -36,9 +36,9 @@ async function hasuraAuth (req, res) {
     const userId = getUserIdFromToken(token)
     if (userId) {
       let cacheKey = 'auth/user/' + userId
-      if (_.has(req.headers, 'x-requested-role')) {
-        cacheKey = cacheKey + ':' + req.headers['x-requested-role']
-      }
+      // if (_.has(req.headers, 'x-requested-role')) {
+      //   cacheKey = cacheKey + ':' + req.headers['x-requested-role']
+      // }
 
       let useCache = true
       if (process.env.DISABLE_AUTH_CACHE === 'yes') {
@@ -51,7 +51,7 @@ async function hasuraAuth (req, res) {
         cached = await redisCache.get(cacheKey)
       }
       if (cached) {
-        return res.json(JSON.parse(cached))
+        return res.json(cached)
       }
 
       // Make sure userId is numeric to prevent injection attack via crafted token
@@ -84,7 +84,7 @@ async function hasuraAuth (req, res) {
         const decoded = decodeToken(token)
 
         // If user has changed password after the token was generated, reject access
-        if (decoded.iat < (userIat - 10)) { // subtract 10 seconds is here to prevent timing issues between postgres and token issue when a token is created right when user registers
+        if (decoded.iat < userIat) { // subtract 10 seconds is here to prevent timing issues between postgres and token issue when a token is created right when user registers
           return res.status(401).json({ message: 'Token has been invalidated!' })
         }
 
@@ -94,7 +94,7 @@ async function hasuraAuth (req, res) {
         }
 
         if (useCache) {
-          await redisCache.set(cacheKey, JSON.stringify(response))
+          await redisCache.set(cacheKey, response)
         }
         return res.json(response)
       }

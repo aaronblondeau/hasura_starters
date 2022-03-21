@@ -22,7 +22,7 @@ public class ActionRegisterController : ControllerBase
             return StatusCode(StatusCodes.Status400BadRequest, new { message = "Authentication action is not properly configured!" });
         }
 
-        if (registerRequest.input == null || registerRequest.input.email == null) {
+        if (registerRequest.input == null || string.IsNullOrEmpty(registerRequest.input.email)) {
             return StatusCode(StatusCodes.Status400BadRequest, new { message = "Email is required." });
         }
         if (!AuthCrypt.IsValidEmail(registerRequest.input.email))
@@ -30,7 +30,7 @@ public class ActionRegisterController : ControllerBase
             return StatusCode(StatusCodes.Status400BadRequest, new { message = "Email is invalid." });
         }
 
-        if (registerRequest.input == null || registerRequest.input.password == null)
+        if (registerRequest.input == null || string.IsNullOrEmpty(registerRequest.input.password))
         {
             return StatusCode(StatusCodes.Status400BadRequest, new { message = "Password is required." });
         }
@@ -43,35 +43,16 @@ public class ActionRegisterController : ControllerBase
         string password = registerRequest.input.password;
         string hashedPassword = AuthCrypt.HashPassword(password);
 
-        HttpClient hasuraClient = new HttpClient();
-        hasuraClient.DefaultRequestHeaders.Add("x-hasura-admin-secret", Environment.GetEnvironmentVariable("HASURA_GRAPHQL_ADMIN_SECRET"));
-
-        var registerResponse = await hasuraClient.PostAsync((Environment.GetEnvironmentVariable("HASURA_BASE_URL") ?? "http://localhost:8000") + "/v1/graphql", new StringContent(JsonSerializer.Serialize(new
+        try
         {
-            operationName = "CreateUser",
-            query = $@"mutation CreateUser {{
-              insert_users(objects: {{email: ""{email}"", password: ""{hashedPassword}""}}) {{
-                returning {{
-                    id
-                    password
-                }}
-              }}
-            }}",
-            // variables = null
-        }), System.Text.Encoding.UTF8, "application/json"));
-        var registerResponseBody = await registerResponse.Content.ReadAsStringAsync();
-        var register = JsonDocument.Parse(registerResponseBody);
-
-        if (register.RootElement.TryGetProperty("errors", out JsonElement errors))
-        {
-            string errorMessage = errors[0].GetProperty("message").GetString() ?? "Unknown error";
-            return StatusCode(StatusCodes.Status400BadRequest, new { message = errorMessage });
+            User user = await UserGraphQL.CreateUser(email, hashedPassword);
+            // Make sure iat in token matches passwordAt so that timing issues don't break this initial token:
+            string token = AuthCrypt.GenerateToken(user.id, jwtSecret, DateTimeOffset.Parse(user.passwordAt ?? "").ToUnixTimeSeconds());
+            return Ok(new LoginRegisterResponse(user.id, token));
         }
-        
-        int id = register.RootElement.GetProperty("data").GetProperty("insert_users").GetProperty("returning")[0].GetProperty("id").GetInt32();
-
-        
-        string token = AuthCrypt.GenerateToken(id, jwtSecret);
-        return Ok(new LoginRegisterResponse(id, token));
+        catch (Exception ex)
+        {
+            return StatusCode(StatusCodes.Status401Unauthorized, new { message = ex.Message });
+        }
     }
 }

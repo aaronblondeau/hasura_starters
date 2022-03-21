@@ -5,13 +5,17 @@ const { default: axios } = require('axios')
 const { v4: uuidv4 } = require('uuid')
 const { redisCache } = require('./cache')
 
-function generateToken (userId) {
+function generateToken (userId, iat) {
+  if (!iat) {
+    iat = Math.ceil(new Date().getTime() / 1000)
+  }
   return jwt.sign({
     'x-hasura-allowed-roles': ['user'],
     'x-hasura-default-role': 'user',
-    'x-hasura-user-id': userId + ''
+    'x-hasura-user-id': userId + '',
+    iat
   }, process.env.JWT_SECRET, {
-    algorithm: process.env.JWT_ALGORITHM || 'HS256'
+    algorithm: process.env.JWT_ALGORITHM || 'HS256',
     // NOTE : This code does not put expirations on tokens - see notes below about password_at checks.
     // Here is how you would put an expiration on a token if needed.
     // expiresIn: process.env.JWT_EXPIRE || '31d'
@@ -186,6 +190,7 @@ async function verifyUserEmail(id) {
 async function updateUserPassword(id, password) {
   // Clear any cached token auth responses
   await redisCache.del('auth/user/' + id)
+  // TODO - must all delete all x-requested-role keys as well!
 
   const hashedNewPassword = await hashPassword(password)
   const response = await axios.post((process.env.HASURA_BASE_URL || 'http://localhost:8000') + '/v1/graphql', {query: 
