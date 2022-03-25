@@ -41,4 +41,6 @@ app.MapControllers();
 Console.WriteLine("~~ Connecting to cache...");
 HasuraStarter.Cache.Instance.Connect();
 
+HasuraStarter.JobQueue.Instance.StartWork();
+
 app.Run();

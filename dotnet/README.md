@@ -105,7 +105,20 @@ docker run --rm -d -p 8000:8000 `
 docker run --rm --name local-redis -p 6379:6379 -d redis
 ```
 
-**4) Start the server**
+**4) Start RabbitMQ**
+
+```
+docker run --rm -d `
+--name rabbitmq `
+-p 15672:15672 `
+-p 5672:5672 `
+-e RABBITMQ_DEFAULT_USER=admin `
+-e RABBITMQ_DEFAULT_PASS=admin `
+-v C:\Users\ablon\Volumes\Volumes\rabbitmq:/var/lib/rabbitmq/ `
+rabbitmq:3-management
+```
+
+**5) Start the server**
 
 ```
 dotnet run

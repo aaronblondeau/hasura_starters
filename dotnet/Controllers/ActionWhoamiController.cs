@@ -16,6 +16,8 @@ public class ActionWhoamiController : ControllerBase
     [HttpPost(Name = "ActionWhoami")]
     public IActionResult Post()
     {
+        JobQueue.Instance.Trigger("Whoami Called!");
+
         string jwtSecret = Environment.GetEnvironmentVariable("JWT_SECRET") ?? string.Empty;
         if (jwtSecret == string.Empty)
         {
