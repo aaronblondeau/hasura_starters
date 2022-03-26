@@ -67,15 +67,15 @@ public class UserGraphQL
         return inflatedUser;
     }
 
-    public static async Task<User> GetUserByEmail(string email)
+    public static async Task<User> GetUserByStringField(string field, string value)
     {
         HttpClient hasuraClient = GetClient();
 
         var userResponse = await hasuraClient.PostAsync((Environment.GetEnvironmentVariable("HASURA_BASE_URL") ?? "http://localhost:8000") + "/v1/graphql", new StringContent(JsonSerializer.Serialize(new
         {
-            operationName = "GetUserByEmail",
-            query = $@"query GetUserByEmail {{
-                users(where: {{email: {{_eq: ""{email}""}}}}) {{
+            operationName = "GetUser",
+            query = $@"query GetUser {{
+                users(where: {{{field}: {{_eq: ""{value}""}}}}) {{
                   {userFields}
                 }}
             }}",
@@ -94,31 +94,22 @@ public class UserGraphQL
         return inflatedUser;
     }
 
+    public static async Task<User> GetUserByEmail(string email)
+    {
+        var user = await GetUserByStringField("email", email);
+        return user;
+    }
+
     public static async Task<User> GetUserByPasswordResetToken(string token)
     {
-        HttpClient hasuraClient = GetClient();
+        var user = await GetUserByStringField("password_reset_token", token);
+        return user;
+    }
 
-        var userResponse = await hasuraClient.PostAsync((Environment.GetEnvironmentVariable("HASURA_BASE_URL") ?? "http://localhost:8000") + "/v1/graphql", new StringContent(JsonSerializer.Serialize(new
-        {
-            operationName = "GetUserByPasswordResetToken",
-            query = $@"query GetUserByPasswordResetToken {{
-                users(where: {{password_reset_token: {{_eq: ""{token}""}}}}) {{
-                  {userFields}
-                }}
-            }}",
-            // variables = null
-        }), System.Text.Encoding.UTF8, "application/json"));
-        var userResponseBody = await userResponse.Content.ReadAsStringAsync();
-        var user = JsonDocument.Parse(userResponseBody);
-
-        CheckDocumentForErrors(user);
-
-        User? inflatedUser = JsonSerializer.Deserialize<User>(user.RootElement.GetProperty("data").GetProperty("users")[0]);
-        if (inflatedUser == null)
-        {
-            throw new InvalidOperationException("Unable to de-serialize user!");
-        }
-        return inflatedUser;
+    public static async Task<User> GetUserByEmailVerifyToken(string token)
+    {
+        var user = await GetUserByStringField("email_verification_token", token);
+        return user;
     }
 
     public static async Task<User> CreateUser(string email, string hashedPassword)
@@ -211,6 +202,34 @@ public class UserGraphQL
             operationName = "UpdatePasswordResetToken",
             query = $@"mutation UpdatePasswordResetToken {{
               update_users_by_pk(pk_columns: {{id: {id}}}, _set: {{password_reset_token: ""{newToken}""}}) {{
+                  { userFields}
+              }}
+            }}",
+            // variables = null
+        }), System.Text.Encoding.UTF8, "application/json"));
+        var updateResponseBody = await updateResponse.Content.ReadAsStringAsync();
+        var update = JsonDocument.Parse(updateResponseBody);
+
+        User? inflatedUser = JsonSerializer.Deserialize<User>(update.RootElement.GetProperty("data").GetProperty("update_users_by_pk"));
+        if (inflatedUser == null)
+        {
+            throw new InvalidOperationException("Unable to de-serialize user!");
+        }
+        return inflatedUser;
+    }
+
+    public static async Task<User> VerifyUser(int id)
+    {
+        HttpClient hasuraClient = GetClient();
+
+        string newToken = Guid.NewGuid().ToString();
+
+        // Update the user
+        var updateResponse = await hasuraClient.PostAsync((Environment.GetEnvironmentVariable("HASURA_BASE_URL") ?? "http://localhost:8000") + "/v1/graphql", new StringContent(JsonSerializer.Serialize(new
+        {
+            operationName = "VerifyUser",
+            query = $@"mutation VerifyUser {{
+              update_users_by_pk(pk_columns: {{id: {id}}}, _set: {{email_verified: true, email_verification_token: null}}) {{
                   { userFields}
               }}
             }}",

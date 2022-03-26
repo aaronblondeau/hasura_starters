@@ -76,6 +76,8 @@ public sealed class JobQueue
                 {
                     Console.WriteLine("~~ would send email to user " + payload.userId);
                     var user = await UserGraphQL.GetUserById(payload.userId);
+
+                    // Reset email link looks like : http://localhost:3000/reset_password/1b70f2c9-6c08-43c3-95df-823089423b3d
                     Console.WriteLine($"TODO send email to {user.email} with password reset token {user.passwordResetToken}");
                 }
             }
