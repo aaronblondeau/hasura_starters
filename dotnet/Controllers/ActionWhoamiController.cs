@@ -14,8 +14,10 @@ public class ActionWhoamiController : ControllerBase
     }
 
     [HttpPost(Name = "ActionWhoami")]
-    public async Task<IActionResult> Post()
+    public IActionResult Post()
     {
+        JobQueue.Instance.TriggerSendPasswordResetEmail(99);
+
         string jwtSecret = Environment.GetEnvironmentVariable("JWT_SECRET") ?? string.Empty;
         if (jwtSecret == string.Empty)
         {

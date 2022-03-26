@@ -42,5 +42,6 @@ app.MapControllers();
 
 Console.WriteLine("~~ Connecting to cache...");
 Cache.Instance.Connect();
+JobQueue.Instance.StartWork();
 
 app.Run();

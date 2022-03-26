@@ -171,4 +171,32 @@ public class UserGraphQL
 
         CheckDocumentForErrors(delete);
     }
+
+    public static async Task<User> UpdatePasswordResetToken(int id)
+    {
+        HttpClient hasuraClient = GetClient();
+
+        string newToken = Guid.NewGuid().ToString();
+
+        // Destroy the user
+        var updateResponse = await hasuraClient.PostAsync((Environment.GetEnvironmentVariable("HASURA_BASE_URL") ?? "http://localhost:8000") + "/v1/graphql", new StringContent(JsonSerializer.Serialize(new
+        {
+            operationName = "UpdatePasswordResetToken",
+            query = $@"mutation UpdatePasswordResetToken {{
+              update_users_by_pk(pk_columns: {{id: {id}}}, _set: {{password_reset_token: ""{newToken}""}}) {{
+                  { userFields}
+              }}
+            }}",
+            // variables = null
+        }), System.Text.Encoding.UTF8, "application/json"));
+        var updateResponseBody = await updateResponse.Content.ReadAsStringAsync();
+        var update = JsonDocument.Parse(updateResponseBody);
+
+        User? inflatedUser = JsonSerializer.Deserialize<User>(update.RootElement.GetProperty("data").GetProperty("update_users_by_pk"));
+        if (inflatedUser == null)
+        {
+            throw new InvalidOperationException("Unable to de-serialize user!");
+        }
+        return inflatedUser;
+    }
 }
