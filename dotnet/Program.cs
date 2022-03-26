@@ -1,3 +1,6 @@
+using MassTransit;
+using HasuraStarter;
+
 var builder = WebApplication.CreateBuilder(args);
 
 var root = Directory.GetCurrentDirectory();
@@ -5,6 +8,35 @@ var dotenv = Path.Combine(root, ".env");
 HasuraStarter.DotEnv.Load(dotenv);
 
 // Add services to the container.
+builder.Services.AddMassTransit(mt =>
+{
+    mt.AddConsumer<SendPasswordResetEmailJobConsumer>();
+
+    mt.UsingRabbitMq((context, cfg) =>
+    {
+        cfg.Host("localhost", "/", h =>
+        {
+            h.Username("admin");
+            h.Password("admin");
+        });
+
+        cfg.ConfigureEndpoints(context);
+    });
+
+    /*
+    mt.UsingInMemory((context, cfg) =>
+    {
+        cfg.ConfigureEndpoints(context);
+    });
+    */
+});
+
+builder.Services.AddOptions<MassTransitHostOptions>()
+    .Configure(options =>
+    {
+        options.WaitUntilStarted = true;
+    });
+
 
 builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
@@ -30,7 +62,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-if(System.Environment.GetEnvironmentVariable("USE_HTTPS") == "yes") {
+if(Environment.GetEnvironmentVariable("USE_HTTPS") == "yes") {
     app.UseHttpsRedirection();
 }
 
@@ -39,8 +71,6 @@ app.UseAuthorization();
 app.MapControllers();
 
 Console.WriteLine("~~ Connecting to cache...");
-HasuraStarter.Cache.Instance.Connect();
-
-HasuraStarter.JobQueue.Instance.StartWork();
+Cache.Instance.Connect();
 
 app.Run();
