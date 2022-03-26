@@ -1,4 +1,3 @@
-using MassTransit;
 using HasuraStarter;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -8,35 +7,6 @@ var dotenv = Path.Combine(root, ".env");
 HasuraStarter.DotEnv.Load(dotenv);
 
 // Add services to the container.
-builder.Services.AddMassTransit(mt =>
-{
-    mt.AddConsumer<SendPasswordResetEmailJobConsumer>();
-
-    mt.UsingRabbitMq((context, cfg) =>
-    {
-        cfg.Host("localhost", "/", h =>
-        {
-            h.Username("admin");
-            h.Password("admin");
-        });
-
-        cfg.ConfigureEndpoints(context);
-    });
-
-    /*
-    mt.UsingInMemory((context, cfg) =>
-    {
-        cfg.ConfigureEndpoints(context);
-    });
-    */
-});
-
-builder.Services.AddOptions<MassTransitHostOptions>()
-    .Configure(options =>
-    {
-        options.WaitUntilStarted = true;
-    });
-
 
 builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle

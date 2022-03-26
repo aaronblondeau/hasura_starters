@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Mvc;
-using MassTransit;
 
 namespace HasuraStarter.Controllers;
 
@@ -8,22 +7,15 @@ namespace HasuraStarter.Controllers;
 public class ActionWhoamiController : ControllerBase
 {
     private readonly ILogger<ActionWhoamiController> _logger;
-    readonly IBus _bus;
 
-    public ActionWhoamiController(ILogger<ActionWhoamiController> logger, IBus bus)
+    public ActionWhoamiController(ILogger<ActionWhoamiController> logger)
     {
         _logger = logger;
-        _bus = bus;
     }
 
     [HttpPost(Name = "ActionWhoami")]
     public async Task<IActionResult> Post()
     {
-        Console.WriteLine("~~dbg HERE X.1 " + _bus);
-        await _bus.Publish(new SendPasswordResetEmail { userId = 99 });
-        Console.WriteLine("~~dbg HERE X.2");
-        // HasuraStarter.SendPasswordResetEmailJobConsumer.CreateJob(99);
-
         string jwtSecret = Environment.GetEnvironmentVariable("JWT_SECRET") ?? string.Empty;
         if (jwtSecret == string.Empty)
         {
