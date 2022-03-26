@@ -35,6 +35,9 @@ async function resetPassword (req, res) {
       if (password !== passwordConfirmation) {
         return res.render('password_reset', { appName: process.env.APP_NAME || 'hasura_starters', title: 'Password Reset', token: token, error: 'Passwords did not match!' })
       }
+      if (password.length < 5) {
+        return res.render('password_reset', { appName: process.env.APP_NAME || 'hasura_starters', title: 'Password Reset', token: token, error: 'Password must be at least 5 characters long.' })
+      }
 
       await updateUserPassword(user.id, password)
 

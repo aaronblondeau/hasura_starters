@@ -39,7 +39,7 @@ if(Environment.GetEnvironmentVariable("USE_HTTPS") == "yes") {
 }
 
 app.UseAuthorization();
-
+app.UseStaticFiles();
 app.MapControllers();
 
 Console.WriteLine("~~ Connecting to cache...");

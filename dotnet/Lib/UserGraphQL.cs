@@ -94,6 +94,33 @@ public class UserGraphQL
         return inflatedUser;
     }
 
+    public static async Task<User> GetUserByPasswordResetToken(string token)
+    {
+        HttpClient hasuraClient = GetClient();
+
+        var userResponse = await hasuraClient.PostAsync((Environment.GetEnvironmentVariable("HASURA_BASE_URL") ?? "http://localhost:8000") + "/v1/graphql", new StringContent(JsonSerializer.Serialize(new
+        {
+            operationName = "GetUserByPasswordResetToken",
+            query = $@"query GetUserByPasswordResetToken {{
+                users(where: {{password_reset_token: {{_eq: ""{token}""}}}}) {{
+                  {userFields}
+                }}
+            }}",
+            // variables = null
+        }), System.Text.Encoding.UTF8, "application/json"));
+        var userResponseBody = await userResponse.Content.ReadAsStringAsync();
+        var user = JsonDocument.Parse(userResponseBody);
+
+        CheckDocumentForErrors(user);
+
+        User? inflatedUser = JsonSerializer.Deserialize<User>(user.RootElement.GetProperty("data").GetProperty("users")[0]);
+        if (inflatedUser == null)
+        {
+            throw new InvalidOperationException("Unable to de-serialize user!");
+        }
+        return inflatedUser;
+    }
+
     public static async Task<User> CreateUser(string email, string hashedPassword)
     {
         HttpClient hasuraClient = GetClient();
@@ -178,7 +205,7 @@ public class UserGraphQL
 
         string newToken = Guid.NewGuid().ToString();
 
-        // Destroy the user
+        // Update the user
         var updateResponse = await hasuraClient.PostAsync((Environment.GetEnvironmentVariable("HASURA_BASE_URL") ?? "http://localhost:8000") + "/v1/graphql", new StringContent(JsonSerializer.Serialize(new
         {
             operationName = "UpdatePasswordResetToken",
