@@ -8,6 +8,8 @@ HasuraStarter.DotEnv.Load(dotenv);
 
 // Add services to the container.
 
+builder.Services.AddRazorPages();
+
 builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
@@ -43,5 +45,7 @@ app.MapControllers();
 Console.WriteLine("~~ Connecting to cache...");
 Cache.Instance.Connect();
 JobQueue.Instance.StartWork();
+
+app.MapRazorPages();
 
 app.Run();
