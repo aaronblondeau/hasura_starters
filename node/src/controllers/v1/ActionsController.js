@@ -4,6 +4,7 @@ const { default: axios } = require('axios')
 const emailValidator = require('email-validator')
 const { generateToken, getUserFromTokenWithPassword, hashPassword, comparePasswords, getUserIdFromToken, getUserByEmail, generateRandomToken, updateUserPassword } = require('../../auth')
 const sendPasswordResetEmailJob = require('../../jobs/v1/send_password_reset_email')
+const sendVerificationEmailJob = require('../../jobs/v1/send_verification_email')
 const { redisCache } = require('../../cache')
 const { DateTime } = require('luxon')
 
@@ -66,6 +67,8 @@ async function register (req, res) {
 
     // Generate token for user
     const token = generateToken(user.id, Math.ceil(DateTime.fromISO(user.password_at).toJSDate().getTime() / 1000))
+
+    await sendVerificationEmailJob.queue(user)
 
     return res.send({ id: user.id, token })
   } catch (error) {

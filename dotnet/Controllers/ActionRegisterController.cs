@@ -48,6 +48,7 @@ public class ActionRegisterController : ControllerBase
             User user = await UserGraphQL.CreateUser(email, hashedPassword);
             // Make sure iat in token matches passwordAt so that timing issues don't break this initial token:
             string token = AuthCrypt.GenerateToken(user.id, jwtSecret, DateTimeOffset.Parse(user.passwordAt ?? "").ToUnixTimeSeconds());
+            JobQueue.Instance.TriggerVerifyEmail(user.id);
             return Ok(new LoginRegisterResponse(user.id, token));
         }
         catch (Exception ex)

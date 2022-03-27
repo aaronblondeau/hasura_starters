@@ -12,7 +12,10 @@ using System.Runtime.Serialization;
 public enum JobType
 {
     [EnumMember(Value = "PasswordResetEmail")]
-    PasswordResetEmail
+    PasswordResetEmail,
+
+    [EnumMember(Value = "VerifyEmail")]
+    VerifyEmail
 }
 
 public class Job
@@ -24,6 +27,11 @@ public class Job
 }
 
 public class PasswordResetEmailJob
+{
+    public int userId { get; set; }
+}
+
+public class VerifyEmailJob
 {
     public int userId { get; set; }
 }
@@ -69,21 +77,31 @@ public sealed class JobQueue
             Console.WriteLine(" [x] Work Received {0}", message);
 
             var job = JsonSerializer.Deserialize<Job>(message);
-            if (job != null && job.jobType == JobType.PasswordResetEmail)
+            if (job != null)
             {
-                var payload = JsonSerializer.Deserialize<PasswordResetEmailJob>(job.payload);
-                if (payload != null)
+                if (job.jobType == JobType.PasswordResetEmail)
                 {
-                    Console.WriteLine("~~ would send email to user " + payload.userId);
-                    var user = await UserGraphQL.GetUserById(payload.userId);
+                    var payload = JsonSerializer.Deserialize<PasswordResetEmailJob>(job.payload);
+                    if (payload != null)
+                    {
+                        var user = await UserGraphQL.GetUserById(payload.userId);
 
-                    // Reset email link looks like : http://localhost:3000/reset_password/1b70f2c9-6c08-43c3-95df-823089423b3d
-                    Console.WriteLine($"TODO send email to {user.email} with password reset token {user.passwordResetToken}");
+                        // Reset email link looks like : http://localhost:3000/reset_password/1b70f2c9-6c08-43c3-95df-823089423b3d
+                        Console.WriteLine($"TODO send email to {user.email} with password reset token {user.passwordResetToken}");
+                    }
+                }
+                else if (job.jobType == JobType.VerifyEmail)
+                {
+                    var payload = JsonSerializer.Deserialize<PasswordResetEmailJob>(job.payload);
+                    if (payload != null)
+                    {
+                        var user = await UserGraphQL.GetUserById(payload.userId);
+
+                        // Reset email link looks like : http://localhost:3000/verify/1b70f2c9-6c08-43c3-95df-823089423b3d
+                        Console.WriteLine($"TODO send email to {user.email} with verification token {user.emailVerificationToken}");
+                    }
                 }
             }
-
-            int dots = message.Split('.').Length - 1;
-            await Task.Delay(1250);
 
             Console.WriteLine(" [x] Done");
 
@@ -100,6 +118,22 @@ public sealed class JobQueue
     {
         var job = new Job() { jobType = JobType.PasswordResetEmail };
         job.payload = JsonSerializer.SerializeToDocument(new PasswordResetEmailJob() { userId = userId });
+        var body = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(job));
+
+        var properties = channel.CreateBasicProperties();
+        properties.Persistent = true;
+
+        channel.BasicPublish(exchange: "",
+                             routingKey: "task_queue",
+                             basicProperties: properties,
+                             body: body);
+        Console.WriteLine(" [x] Trigger Sent {0}", body);
+    }
+
+    public void TriggerVerifyEmail(int userId)
+    {
+        var job = new Job() { jobType = JobType.VerifyEmail };
+        job.payload = JsonSerializer.SerializeToDocument(new VerifyEmailJob() { userId = userId });
         var body = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(job));
 
         var properties = channel.CreateBasicProperties();
