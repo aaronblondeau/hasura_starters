@@ -1,4 +1,4 @@
-# hasura_starters - Node
+# hasura_starters - .NET
 
 This repo provides a starter project for creting an API with Hasura and .NET.
 
