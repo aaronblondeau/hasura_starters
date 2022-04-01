@@ -3,7 +3,7 @@
 This repo provides a starter project for creting an API with Hasura and Node.js.
 
 It includes the following
-- User authentication (with JWT tokens)
+- User authentication (with JWT tokens) via Supertokens
 - User email verification and password resets (emails sent with Mailjet)
 - Kubernetes friendly /readycheck and /healthcheck endpoints
 - Graceful shutdowns (with terminus)
@@ -75,7 +75,17 @@ For mac or windows replace 172.17.0.1 with host.docker.internal
 Note, HASURA_GRAPHQL_ENABLE_CONSOLE is set to false because you will need to run the hasura console from the cli in order to capture metadata and migrations as you create them.  **You must manually run the console for it to track your changes - see step 5 below!**
 
 ```
-TODO - update with HASURA_GRAPHQL_JWT_SECRET from below
+docker run --rm -d -p 8000:8000 \
+  -e HASURA_GRAPHQL_SERVER_PORT=8000 \
+  -e HASURA_GRAPHQL_DATABASE_URL=postgres://postgres:pgadmin@host.docker.internal:5432/hasura_starters \
+  -e HASURA_GRAPHQL_ENABLE_CONSOLE=false \
+  -e HASURA_GRAPHQL_ADMIN_SECRET=mydevsecret \
+  -e HASURA_GRAPHQL_UNAUTHORIZED_ROLE=public \
+  -e HASURA_GRAPHQL_JWT_SECRET='{"jwk_url": "http://host.docker.internal:3000/auth/jwt/jwks.json"}' \
+  -e ACTIONS_BASE_URL=http://host.docker.internal:3000/hasura/actions \
+  -e EVENTS_WEBHOOK_URL=http://host.docker.internal:3000/hasura/events \
+  -e HASURA_GRAPHQL_CORS_DOMAIN=* \
+  hasura/graphql-engine:latest
 ```
 
 On Windows:
