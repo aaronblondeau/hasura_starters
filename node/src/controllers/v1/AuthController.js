@@ -24,27 +24,7 @@ supertokens.init({
   },
   recipeList: [
       // https://supertokens.com/docs/nodejs/emailpassword/init
-      EmailPassword.init({
-        // emailVerificationFeature: {
-        //   getEmailVerificationURL: async (user) => {
-        //     return 'TODO'
-        //   },
-        //   createAndSendCustomEmail: async (user, emailVerificationURLWithToken) => {
-        //     console.log('~~dbg send email verification email', user, emailVerificationURLWithToken)
-        //     // TODO
-        //     // await sendPasswordResetEmailJob.queue(updateUserResponse.data.data.update_users_by_pk)
-        //   }
-        // },
-        // resetPasswordUsingTokenFeature: {
-        //   getResetPasswordURL: async (user) => {
-        //     return 'TODO'
-        //   },
-        //   createAndSendCustomEmail: async (user, passwordResetURLWithToken) => {
-        //     console.log('~~dbg send password reset email', user, emailVerificationURLWithToken)
-        //     // TODO
-        //   }
-        // }
-      }), // initializes signin / sign up features
+      EmailPassword.init(), // initializes signin / sign up features
       Session.init({
         jwt: {
           enable: true

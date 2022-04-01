@@ -7,6 +7,7 @@ const sendVerificationEmailJob = require('../../jobs/v1/send_verification_email'
 const { DateTime } = require('luxon')
 const Session = require('supertokens-node/recipe/session')
 const EmailPassword = require('supertokens-node/recipe/emailpassword')
+const { deleteUser } = require('supertokens-node')
 
 const router = express.Router()
 
@@ -48,7 +49,7 @@ async function register (req, res) {
 
     // TODO - send verify.token in an email
     console.log('~~ TODO send email verification token ' + verify.token)
-    
+
     await Session.createNewSession(res, user.id)
     let sessionHandles = await Session.getAllSessionHandlesForUser(user.id)
     let token = ''
@@ -141,78 +142,77 @@ async function whoami (req, res) {
   }
 }
 
-// async function changePassword (req, res) {
-//   try {
-//     let oldPassword = ''
-//     if (_.has(req, 'body.input.old_password')) {
-//       oldPassword = req.body.input.old_password
-//     } else {
-//       return res.status(400).send({ message: 'Old password is required.' })
-//     }
+async function changePassword (req, res) {
+  try {
+    let oldPassword = ''
+    if (_.has(req, 'body.input.old_password')) {
+      oldPassword = req.body.input.old_password
+    } else {
+      return res.status(400).send({ message: 'Old password is required.' })
+    }
 
-//     let newPassword = ''
-//     if (_.has(req, 'body.input.new_password')) {
-//       newPassword = req.body.input.new_password
-//     } else {
-//       return res.status(400).send({ message: 'New password is required.' })
-//     }
-//     if (newPassword.length < 5) {
-//       return res.status(400).send({ message: 'New password must be at least 5 characters long.' })
-//     }
+    let newPassword = ''
+    if (_.has(req, 'body.input.new_password')) {
+      newPassword = req.body.input.new_password
+    } else {
+      return res.status(400).send({ message: 'New password is required.' })
+    }
+
+    let token = req.headers.authorization || ''
+
+    const id = getUserIdFromToken(token)
+    const user = await EmailPassword.getUserById(id)
+    // Check old password
+    const signin = await EmailPassword.signIn(user.email, oldPassword)
+    if (signin.status === 'WRONG_CREDENTIALS_ERROR') {
+      throw new Error('Old password did not match!')
+    }
+    // Save new password
+    await EmailPassword.updateEmailOrPassword({
+      userId: user.id,
+      password: newPassword
+    })
+
+    // TODO Kill old sessions
+    // This does not revoke tokens...
+    // await Session.revokeAllSessionsForUser(user.id)
+
+    return res.send({ password_at: DateTime.now().toISO() })
     
-//     let token = req.headers.authorization || ''
+  } catch (error) {
+    console.error(error)
+    return res.status(400).send({ message: error.message + '' })
+  }
+}
 
-//     const user = await getUserFromTokenWithPassword(token, oldPassword)
-//     if (user) {
-//       const updatedUser = await updateUserPassword(user.id, newPassword)
-//       return res.send({ password_at: updatedUser.password_at })
-//     }
-//     return res.status(401).json({ message: 'User not found or old password not matched!' })
-//   } catch (error) {
-//     console.error(error)
-//     return res.status(400).send({ message: error.message + '' })
-//   }
-// }
+// https://supertokens.com/docs/emailpassword/common-customizations/delete-user
+async function destroyUser (req, res) {
+  try {
+    let password = ''
+    if (_.has(req, 'body.input.password')) {
+      password = req.body.input.password
+    } else {
+      return res.status(400).send({ message: 'password is required.' })
+    }
 
-// // https://supertokens.com/docs/emailpassword/common-customizations/delete-user
-// async function destroyUser (req, res) {
-//   try {
-//     let password = ''
-//     if (_.has(req, 'body.input.password')) {
-//       password = req.body.input.password
-//     } else {
-//       return res.status(400).send({ message: 'password is required.' })
-//     }
+    let token = req.headers.authorization || ''
 
-//     let token = req.headers.authorization || ''
+    const id = getUserIdFromToken(token)
+    const user = await EmailPassword.getUserById(id)
+    // Check old password
+    const signin = await EmailPassword.signIn(user.email, password)
+    if (signin.status === 'WRONG_CREDENTIALS_ERROR') {
+      throw new Error('Password did not match!')
+    }
 
-//     const user = await getUserFromTokenWithPassword(token, password)
-//     if (user) {
-//       // TODO - must all delete all x-requested-role keys as well!
+    await deleteUser(user.id)
 
-//       const destroyUserResponse = await axios.post((process.env.HASURA_BASE_URL || 'http://localhost:8000') + '/v1/graphql', {query: 
-//       `
-//       mutation DeleteUser {
-//         delete_users_by_pk(id: ${user.id}) {
-//           id
-//         }
-//       }
-//       `
-//       }, {headers: {
-//         'x-hasura-admin-secret': process.env.HASURA_GRAPHQL_ADMIN_SECRET
-//       }})
-//       if (destroyUserResponse.data.errors) {
-//         throw new Error(response.data.errors[0].message)
-//       }
-//       return res.send({ success: true })
-//     } else {
-//       return res.status(401).json({ message: 'Invalid token.  You must be logged in to perform this action!' })
-//     }
-//   } catch (error) {
-//     console.error(error)
-//     return res.status(400).send({ message: error.message + '' })
-//   }
-// }
+    return res.send({ success: true })
+  } catch (error) {
+    console.error(error)
+    return res.status(400).send({ message: error.message + '' })
+  }
+}
 
 async function resetPassword (req, res) {
   try {
@@ -246,8 +246,8 @@ async function resetPassword (req, res) {
 router.post('/register', register)
 router.post('/login', login)
 router.post('/whoami', whoami)
-// router.post('/changePassword', changePassword)
-// router.post('/destroyUser', destroyUser)
+router.post('/changePassword', changePassword)
+router.post('/destroyUser', destroyUser)
 router.post('/resetPassword', resetPassword)
 
 module.exports = {

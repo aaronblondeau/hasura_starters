@@ -28,8 +28,10 @@ async function resetPassword (req, res) {
       if (password !== passwordConfirmation) {
         return res.render('password_reset', { appName: process.env.APP_NAME || 'hasura_starters', title: 'Password Reset', token: token, error: 'Passwords did not match!' })
       }
-      
+
       await EmailPassword.resetPasswordUsingToken(token, password)
+
+      // TODO Kill old sessions
 
       res.render('password_reset_success', { appName: process.env.APP_NAME || 'hasura_starters' })
     } else {
