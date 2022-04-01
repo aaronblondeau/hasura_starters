@@ -4,11 +4,11 @@ This repo provides a starter project for creting an API with Hasura and Node.js.
 
 It includes the following
 - User authentication (with JWT tokens) via Supertokens
-- User email verification and password resets (emails sent with Mailjet)
+- User email verification and password resets (emails sent with Mailjet) *INCOMPLETE*
 - Kubernetes friendly /readycheck and /healthcheck endpoints
 - Graceful shutdowns (with terminus)
 - Hasura actions and events configurations / controllers
-- Backend job processing with BullMQ
+- Backend job processing with BullMQ *INCOMPLETE*
 - Arena UI for BullMQ
 
 This project does not provide a user interface other than for user authentication workflows such as password resets.  It is intended for use as a backend for a Vue or React frontend.
