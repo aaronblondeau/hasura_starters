@@ -49,7 +49,7 @@ app.all('/healthcheck', async (req, res) => {
   res.json({ healthy: true, hasura: hasuraCheck.data })
 })
 
-app.use('/hasura/auth', authController.router)
+app.use('/', authController.router)
 app.use('/hasura/actions', actionsController.router)
 app.use('/hasura/events', eventsController.router)
 app.use('/web', webController.router)

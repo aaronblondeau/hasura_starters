@@ -28,7 +28,6 @@
     "bull-arena": "^3.29.2",
     "bullmq": "^1.42.1",
     "cache-manager": "^3.4.4",
-    "cache-manager-ioredis": "^2.1.0",
     "cors": "^2.8.5",
     "dotenv": "^10.0.0",
     "email-validator": "^2.0.4",
@@ -36,12 +35,14 @@
     "fs-extra": "^10.0.0",
     "handlebars": "^4.7.7",
     "jsonwebtoken": "^8.5.1",
+    "jwk-to-pem": "^2.0.5",
     "lodash": "^4.17.21",
     "luxon": "^2.0.2",
     "md5": "^2.3.0",
     "mjml": "^4.10.2",
     "node-mailjet": "^3.3.4",
     "pug": "^3.0.2",
+    "supertokens-node": "^9.1.1",
     "uuid": "^8.3.2"
   }
 }

@@ -1,116 +1,87 @@
 const express = require('express')
-const _ = require('lodash')
-const { redisCache } = require('../../cache')
-const { DateTime } = require('luxon')
-const { default: axios } = require('axios')
-const { matchesUserIdFormat, getUserIdFromToken, decodeToken } = require('../../auth')
-
 const router = express.Router()
+const cors = require('cors')
 
-async function hasuraAuth (req, res) {
-  try {
-    if (!process.env.JWT_SECRET) {
-      return res.status(500).json({ message: 'Authentication action is not properly configured!' })
-    }
+const supertokens = require('supertokens-node')
+const Session = require('supertokens-node/recipe/session')
+const EmailPassword = require('supertokens-node/recipe/emailpassword')
+const { middleware, errorHandler  } = require('supertokens-node/framework/express')
 
-    let token = req.headers.authorization || ''
+supertokens.init({
+  framework: "express",
+  supertokens: {
+      // try.supertokens.com is for demo purposes. Replace this with the address of your core instance (sign up on supertokens.com), or self host a core.
+      connectionURI: "http://localhost:3567",
+      // apiKey: "IF YOU HAVE AN API KEY FOR THE CORE, ADD IT HERE",
+  },
+  appInfo: {
+      // learn more about this on https://supertokens.com/docs/session/appinfo
+      appName: "Hasura Starters",
+      apiDomain: "http://localhost:3000",
+      websiteDomain: "http://localhost:3000",
+      apiBasePath: "/auth",
+      websiteBasePath: "/web",
+  },
+  recipeList: [
+      // https://supertokens.com/docs/nodejs/emailpassword/init
+      EmailPassword.init({
+        // emailVerificationFeature: {
+        //   getEmailVerificationURL: async (user) => {
+        //     return 'TODO'
+        //   },
+        //   createAndSendCustomEmail: async (user, emailVerificationURLWithToken) => {
+        //     console.log('~~dbg send email verification email', user, emailVerificationURLWithToken)
+        //     // TODO
+        //     // await sendPasswordResetEmailJob.queue(updateUserResponse.data.data.update_users_by_pk)
+        //   }
+        // },
+        // resetPasswordUsingTokenFeature: {
+        //   getResetPasswordURL: async (user) => {
+        //     return 'TODO'
+        //   },
+        //   createAndSendCustomEmail: async (user, passwordResetURLWithToken) => {
+        //     console.log('~~dbg send password reset email', user, emailVerificationURLWithToken)
+        //     // TODO
+        //   }
+        // }
+      }), // initializes signin / sign up features
+      Session.init({
+        jwt: {
+          enable: true
+        },
+        override: {
+          functions: function (originalImplementation) {
+            return {
+              ...originalImplementation,
+              createNewSession: async function (input) {
 
-    if (!token && _.has(req, 'body.token')) {
-      token = req.body.token || ''
-    }
+                input.accessTokenPayload = {
+                  ...input.accessTokenPayload,
+                  "https://hasura.io/jwt/claims": {
+                    "x-hasura-user-id": input.userId,
+                    "x-hasura-default-role": "user",
+                    "x-hasura-allowed-roles": ["user"],
+                  }
+                }
 
-    if (!token && _.has(req, 'query.token')) {
-      token = req.query.token || ''
-    }
-
-    if (token && (_.startsWith(token, 'Bearer'))) {
-      token = token.replace('Bearer ', '')
-    }
-
-    if (!token) {
-      return res.json({
-        'x-hasura-role': 'public'
-      })
-    }
-
-    const userId = getUserIdFromToken(token)
-    if (userId) {
-      let cacheKey = 'auth/user/' + userId
-      // if (_.has(req.headers, 'x-requested-role')) {
-      //   cacheKey = cacheKey + ':' + req.headers['x-requested-role']
-      // }
-
-      let useCache = true
-      if (process.env.DISABLE_AUTH_CACHE === 'yes') {
-        useCache = false
-      }
-
-      // Use cache to prevent roundtrip to database here
-      let cached = null
-      if (useCache) {
-        cached = await redisCache.get(cacheKey)
-      }
-      if (cached) {
-        return res.json(cached)
-      }
-
-      // Make sure userId is numeric to prevent injection attack via crafted token
-      if (!matchesUserIdFormat(userId)) {
-        return res.status(400).send({ message: 'Bad token!' })
-      }
-
-      // Use graphql to fetch user
-      const userResponse = await axios.post((process.env.HASURA_BASE_URL || 'http://localhost:8000') + '/v1/graphql', {query: 
-      `
-      query GetUser {
-        users_by_pk(id: ${userId}) {
-          id
-          password_at
+                return originalImplementation.createNewSession(input)
+              }
+            }
+          }
         }
-      }
-      `
-      }, {headers: {
-        'x-hasura-admin-secret': process.env.HASURA_GRAPHQL_ADMIN_SECRET
-      }})
-      if (userResponse.data.errors) {
-        throw new Error(response.data.errors[0].message)
-      }
+      }) // initializes session features
+  ]
+})
 
-      if (userResponse.data.data.users_by_pk) {
-        const user = userResponse.data.data.users_by_pk
-        const passwordAt = DateTime.fromISO(user.password_at).toJSDate()
-        const userIat = Math.ceil(passwordAt.getTime() / 1000)
+router.use(cors({
+  origin: ["http://localhost:3000", "https://hoppscotch.io/"],
+  allowedHeaders: ["content-type", ...supertokens.getAllCORSHeaders()],
+  credentials: true,
+}))
+router.use(middleware())
+console.log("~~ Mounted supertokens")
 
-        const decoded = decodeToken(token)
-
-        // If user has changed password after the token was generated, reject access
-        if (decoded.iat < userIat) { // subtract 10 seconds is here to prevent timing issues between postgres and token issue when a token is created right when user registers
-          return res.status(401).json({ message: 'Token has been invalidated!' })
-        }
-
-        let response = {
-          'x-hasura-role': 'user',
-          'x-hasura-user-id': user.id + ''
-        }
-
-        if (useCache) {
-          await redisCache.set(cacheKey, response)
-        }
-        return res.json(response)
-      }
-    }
-
-    return res.json({
-      'x-hasura-role': 'public'
-    })
-  } catch (error) {
-    console.error(error)
-    return res.status(401).json({ message: error.message })
-  }
-}
-
-router.get('/', hasuraAuth)
-router.post('/', hasuraAuth)
+router.use(errorHandler())
 
 module.exports = {
   router

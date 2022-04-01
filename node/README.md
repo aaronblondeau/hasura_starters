@@ -22,7 +22,7 @@ You must set the following environment variables before running the Node.js serv
 
 For development you can copy .env.example to .env.
 
-This project runs postgres, hasura, and redis in docker containers.  The commands below include "--rm" so that they are easy to re-run. If you have problems with the container, remove the "--rm" so that you can use these commands to troubleshoot:
+This project runs postgres, hasura, supertokens, and redis in docker containers.  The commands below include "--rm" so that they are easy to re-run. If you have problems with the container, remove the "--rm" so that you can use these commands to troubleshoot:
 
 ```
 docker ps -a
@@ -75,16 +75,7 @@ For mac or windows replace 172.17.0.1 with host.docker.internal
 Note, HASURA_GRAPHQL_ENABLE_CONSOLE is set to false because you will need to run the hasura console from the cli in order to capture metadata and migrations as you create them.  **You must manually run the console for it to track your changes - see step 5 below!**
 
 ```
-docker run --rm -d -p 8000:8000 \
-  -e HASURA_GRAPHQL_SERVER_PORT=8000 \
-  -e HASURA_GRAPHQL_DATABASE_URL=postgres://postgres:pgadmin@172.17.0.1:5432/hasura_starters \
-  -e HASURA_GRAPHQL_ENABLE_CONSOLE=false \
-  -e HASURA_GRAPHQL_ADMIN_SECRET=mydevsecret \
-  -e HASURA_GRAPHQL_AUTH_HOOK=http://172.17.0.1:3000/hasura/auth \
-  -e ACTIONS_BASE_URL=http://172.17.0.1:3000/hasura/actions \
-  -e EVENTS_WEBHOOK_URL=http://172.17.0.1:3000/hasura/events \
-  -e HASURA_GRAPHQL_CORS_DOMAIN=* \
-  hasura/graphql-engine:latest
+TODO - update with HASURA_GRAPHQL_JWT_SECRET from below
 ```
 
 On Windows:
@@ -94,7 +85,8 @@ docker run --rm -d -p 8000:8000 `
   -e HASURA_GRAPHQL_DATABASE_URL=postgres://postgres:pgadmin@host.docker.internal:5432/hasura_starters `
   -e HASURA_GRAPHQL_ENABLE_CONSOLE=false `
   -e HASURA_GRAPHQL_ADMIN_SECRET=mydevsecret `
-  -e HASURA_GRAPHQL_AUTH_HOOK=http://host.docker.internal:3000/hasura/auth `
+  -e HASURA_GRAPHQL_UNAUTHORIZED_ROLE=public `
+  -e HASURA_GRAPHQL_JWT_SECRET='{\"jwk_url\": \"http://host.docker.internal:3000/auth/jwt/jwks.json\"}' `
   -e ACTIONS_BASE_URL=http://host.docker.internal:3000/hasura/actions `
   -e EVENTS_WEBHOOK_URL=http://host.docker.internal:3000/hasura/events `
   -e HASURA_GRAPHQL_CORS_DOMAIN=* `
@@ -107,7 +99,26 @@ docker run --rm -d -p 8000:8000 `
 docker run --rm --name local-redis -p 6379:6379 -d redis
 ```
 
-**4) Start the Node.js server**
+**4) Start supertokens**
+
+```
+docker run --rm -d \
+  --name supertokens \
+  -p 3567:3567 \
+  -e POSTGRESQL_CONNECTION_URI=postgresql://postgres:pgadmin@host.docker.internal:5432/hasura_starters \
+  registry.supertokens.io/supertokens/supertokens-postgresql
+```
+
+On Windows:
+```
+docker run --rm -d `
+  --name supertokens `
+  -p 3567:3567 `
+  -e POSTGRESQL_CONNECTION_URI=postgresql://postgres:pgadmin@host.docker.internal:5432/hasura_starters `
+  registry.supertokens.io/supertokens/supertokens-postgresql
+```
+
+**5) Start the Node.js server**
 
 This project has only been tested on node 14 and 16.
 
@@ -118,7 +129,7 @@ yarn install
 yarn dev
 ```
 
-**5) start hasura console**
+**6) start hasura console**
 
 The hasura cli was installed via yarn with the commands above.  You may want to [install the cli globally](https://hasura.io/docs/latest/graphql/core/hasura-cli/install-hasura-cli.html).
 

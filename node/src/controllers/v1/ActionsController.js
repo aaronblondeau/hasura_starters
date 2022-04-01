@@ -1,12 +1,12 @@
 const express = require('express')
 const _ = require('lodash')
-const { default: axios } = require('axios')
 const emailValidator = require('email-validator')
-const { generateToken, getUserFromTokenWithPassword, hashPassword, comparePasswords, getUserIdFromToken, getUserByEmail, generateRandomToken, updateUserPassword } = require('../../auth')
+const { getUserIdFromToken } = require('../../auth')
 const sendPasswordResetEmailJob = require('../../jobs/v1/send_password_reset_email')
 const sendVerificationEmailJob = require('../../jobs/v1/send_verification_email')
-const { redisCache } = require('../../cache')
 const { DateTime } = require('luxon')
+const Session = require('supertokens-node/recipe/session')
+const EmailPassword = require('supertokens-node/recipe/emailpassword')
 
 const router = express.Router()
 
@@ -40,37 +40,27 @@ async function register (req, res) {
     if (password.length < 5) {
       return res.status(400).send({ message: 'Password must be at least 5 characters long.' })
     }
-    const hashedPassword = await hashPassword(password)
 
-    console.log((process.env.HASURA_BASE_URL || 'http://localhost:8000') + '/v1/graphql', hashedPassword, email)
+    const signup = await EmailPassword.signUp(email, password)
+    const user = signup.user
 
-    const createUserResponse = await axios.post((process.env.HASURA_BASE_URL || 'http://localhost:8000') + '/v1/graphql', {query: 
-    `
-    mutation CreateUser {
-      insert_users(objects: {email: "${email}", password: "${hashedPassword}"}) {
-        returning {
-          id
-          password
-          password_at
-        }
+    const verify = await EmailPassword.createEmailVerificationToken(user.id)
+
+    // TODO - send verify.token in an email
+    console.log('~~ TODO send email verification token ' + verify.token)
+    
+    await Session.createNewSession(res, user.id)
+    let sessionHandles = await Session.getAllSessionHandlesForUser(user.id)
+    let token = ''
+
+    for (const handle of sessionHandles) {
+      const sessionInfo = await Session.getSessionInformation(handle)
+      const jwt = sessionInfo.accessTokenPayload["jwt"]
+      if (jwt) {
+        token = jwt
       }
     }
-    `
-    }, {headers: {
-      'x-hasura-admin-secret': process.env.HASURA_GRAPHQL_ADMIN_SECRET
-    }})
-    if (createUserResponse.data.errors) {
-      throw new Error(createUserResponse.data.errors[0].message)
-    }
-
-    const user = createUserResponse.data.data.insert_users.returning[0]
-
-    // Generate token for user
-    const token = generateToken(user.id, Math.ceil(DateTime.fromISO(user.password_at).toJSDate().getTime() / 1000))
-
-    await sendVerificationEmailJob.queue(user)
-
-    return res.send({ id: user.id, token })
+    return res.json({ token, id: user.id })
   } catch (error) {
     console.error(error)
     return res.status(400).send({ message: error.message + '' })
@@ -112,20 +102,23 @@ async function login (req, res) {
       return res.status(401).json({ message: 'Both password and email must be provided!' })
     }
 
-    const user = await getUserByEmail(email)
-    if (user) {
-      const passwordMatches = await comparePasswords(password, user.password)
-      if (!passwordMatches) {
-        return res.status(401).json({ message: 'email or password did not match!' })
-      }
-
-      // User found and password matched - issue token!
-      const token = generateToken(user.id)
-
-      return res.json({ token, id: user.id })
-    } else {
-      return res.status(400).send({ message: 'email not found!' })
+    const signin = await EmailPassword.signIn(email, password)
+    if (signin.status === 'WRONG_CREDENTIALS_ERROR') {
+      throw new Error('Incorrect email or password!')
     }
+    const user = signin.user
+    await Session.createNewSession(res, user.id)
+    let sessionHandles = await Session.getAllSessionHandlesForUser(user.id)
+    let token = ''
+
+    for (const handle of sessionHandles) {
+      const sessionInfo = await Session.getSessionInformation(handle)
+      const jwt = sessionInfo.accessTokenPayload["jwt"]
+      if (jwt) {
+        token = jwt
+      }
+    }
+    return res.json({ token, id: user.id })
   } catch (error) {
     console.error(error)
     return res.status(400).send({ message: error.message + '' })
@@ -148,78 +141,78 @@ async function whoami (req, res) {
   }
 }
 
-async function changePassword (req, res) {
-  try {
-    let oldPassword = ''
-    if (_.has(req, 'body.input.old_password')) {
-      oldPassword = req.body.input.old_password
-    } else {
-      return res.status(400).send({ message: 'Old password is required.' })
-    }
+// async function changePassword (req, res) {
+//   try {
+//     let oldPassword = ''
+//     if (_.has(req, 'body.input.old_password')) {
+//       oldPassword = req.body.input.old_password
+//     } else {
+//       return res.status(400).send({ message: 'Old password is required.' })
+//     }
 
-    let newPassword = ''
-    if (_.has(req, 'body.input.new_password')) {
-      newPassword = req.body.input.new_password
-    } else {
-      return res.status(400).send({ message: 'New password is required.' })
-    }
-    if (newPassword.length < 5) {
-      return res.status(400).send({ message: 'New password must be at least 5 characters long.' })
-    }
+//     let newPassword = ''
+//     if (_.has(req, 'body.input.new_password')) {
+//       newPassword = req.body.input.new_password
+//     } else {
+//       return res.status(400).send({ message: 'New password is required.' })
+//     }
+//     if (newPassword.length < 5) {
+//       return res.status(400).send({ message: 'New password must be at least 5 characters long.' })
+//     }
     
-    let token = req.headers.authorization || ''
+//     let token = req.headers.authorization || ''
 
-    const user = await getUserFromTokenWithPassword(token, oldPassword)
-    if (user) {
-      const updatedUser = await updateUserPassword(user.id, newPassword)
-      return res.send({ password_at: updatedUser.password_at })
-    }
-    return res.status(401).json({ message: 'User not found or old password not matched!' })
-  } catch (error) {
-    console.error(error)
-    return res.status(400).send({ message: error.message + '' })
-  }
-}
+//     const user = await getUserFromTokenWithPassword(token, oldPassword)
+//     if (user) {
+//       const updatedUser = await updateUserPassword(user.id, newPassword)
+//       return res.send({ password_at: updatedUser.password_at })
+//     }
+//     return res.status(401).json({ message: 'User not found or old password not matched!' })
+//   } catch (error) {
+//     console.error(error)
+//     return res.status(400).send({ message: error.message + '' })
+//   }
+// }
 
-async function destroyUser (req, res) {
-  try {
-    let password = ''
-    if (_.has(req, 'body.input.password')) {
-      password = req.body.input.password
-    } else {
-      return res.status(400).send({ message: 'password is required.' })
-    }
+// // https://supertokens.com/docs/emailpassword/common-customizations/delete-user
+// async function destroyUser (req, res) {
+//   try {
+//     let password = ''
+//     if (_.has(req, 'body.input.password')) {
+//       password = req.body.input.password
+//     } else {
+//       return res.status(400).send({ message: 'password is required.' })
+//     }
 
-    let token = req.headers.authorization || ''
+//     let token = req.headers.authorization || ''
 
-    const user = await getUserFromTokenWithPassword(token, password)
-    if (user) {
-      await redisCache.del('auth/user/' + user.id)
-      // TODO - must all delete all x-requested-role keys as well!
+//     const user = await getUserFromTokenWithPassword(token, password)
+//     if (user) {
+//       // TODO - must all delete all x-requested-role keys as well!
 
-      const destroyUserResponse = await axios.post((process.env.HASURA_BASE_URL || 'http://localhost:8000') + '/v1/graphql', {query: 
-      `
-      mutation DeleteUser {
-        delete_users_by_pk(id: ${user.id}) {
-          id
-        }
-      }
-      `
-      }, {headers: {
-        'x-hasura-admin-secret': process.env.HASURA_GRAPHQL_ADMIN_SECRET
-      }})
-      if (destroyUserResponse.data.errors) {
-        throw new Error(response.data.errors[0].message)
-      }
-      return res.send({ success: true })
-    } else {
-      return res.status(401).json({ message: 'Invalid token.  You must be logged in to perform this action!' })
-    }
-  } catch (error) {
-    console.error(error)
-    return res.status(400).send({ message: error.message + '' })
-  }
-}
+//       const destroyUserResponse = await axios.post((process.env.HASURA_BASE_URL || 'http://localhost:8000') + '/v1/graphql', {query: 
+//       `
+//       mutation DeleteUser {
+//         delete_users_by_pk(id: ${user.id}) {
+//           id
+//         }
+//       }
+//       `
+//       }, {headers: {
+//         'x-hasura-admin-secret': process.env.HASURA_GRAPHQL_ADMIN_SECRET
+//       }})
+//       if (destroyUserResponse.data.errors) {
+//         throw new Error(response.data.errors[0].message)
+//       }
+//       return res.send({ success: true })
+//     } else {
+//       return res.status(401).json({ message: 'Invalid token.  You must be logged in to perform this action!' })
+//     }
+//   } catch (error) {
+//     console.error(error)
+//     return res.status(400).send({ message: error.message + '' })
+//   }
+// }
 
 async function resetPassword (req, res) {
   try {
@@ -236,32 +229,14 @@ async function resetPassword (req, res) {
       return res.status(400).send({ message: 'Email is invalid!' })
     }
 
-    const user = await getUserByEmail(email)
+    const user = await EmailPassword.getUserByEmail(email)
+    const reset = await EmailPassword.createResetPasswordToken(user.id)
 
-    if (user) {
-      const newToken = generateRandomToken()
-      const updateUserResponse = await axios.post((process.env.HASURA_BASE_URL || 'http://localhost:8000') + '/v1/graphql', {query: 
-      `
-      mutation UpdatePasswordResetToken {
-        update_users_by_pk(pk_columns: {id: ${user.id}}, _set: {password_reset_token: "${newToken}"}) {
-          id
-          email
-          password_reset_token
-        }
-      }
-      `
-      }, {headers: {
-        'x-hasura-admin-secret': process.env.HASURA_GRAPHQL_ADMIN_SECRET
-      }})
-      if (updateUserResponse.data.errors) {
-        throw new Error(response.data.errors[0].message)
-      }
+    // TODO - send reset.token in an email
+    console.log('~~ TODO send password reset verification token ' + reset.token)
 
-      await sendPasswordResetEmailJob.queue(updateUserResponse.data.data.update_users_by_pk)
-      return res.send({ success: true })
-    }
-    
-    return res.status(401).json({ message: 'Invalid email!' })
+    return res.send({ success: true })
+
   } catch (error) {
     console.error(error)
     return res.status(400).send({ message: error.message + '' })
@@ -271,8 +246,8 @@ async function resetPassword (req, res) {
 router.post('/register', register)
 router.post('/login', login)
 router.post('/whoami', whoami)
-router.post('/changePassword', changePassword)
-router.post('/destroyUser', destroyUser)
+// router.post('/changePassword', changePassword)
+// router.post('/destroyUser', destroyUser)
 router.post('/resetPassword', resetPassword)
 
 module.exports = {

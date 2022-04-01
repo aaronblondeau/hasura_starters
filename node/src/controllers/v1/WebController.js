@@ -1,5 +1,5 @@
 const express = require('express')
-const { getUserByPasswordResetToken, updateUserPassword, getUserByEmailVerificationToken, verifyUserEmail } = require('../../auth')
+const EmailPassword = require('supertokens-node/recipe/emailpassword')
 const router = express.Router()
 
 async function resetPasswordForm (req, res) {
@@ -8,13 +8,7 @@ async function resetPasswordForm (req, res) {
     if (!token) {
       return res.render('password_reset', { appName: process.env.APP_NAME || 'hasura_starters', error: 'token is required!' })
     }
-
-    const user = await getUserByPasswordResetToken(token)
-    if (user) {
-      res.render('password_reset', { appName: process.env.APP_NAME || 'hasura_starters', token })
-    } else {
-      res.render('error', { appName: process.env.APP_NAME || 'hasura_starters', message: 'Invalid token.' })
-    }
+    res.render('password_reset', { appName: process.env.APP_NAME || 'hasura_starters', token })    
   } catch (error) {
     res.render('error', { appName: process.env.APP_NAME || 'hasura_starters', message: error.message })
   }
@@ -27,7 +21,6 @@ async function resetPassword (req, res) {
       return res.render('password_reset', { appName: process.env.APP_NAME || 'hasura_starters', title: 'Password Reset', error: 'token is required!' })
     }
 
-    const user = await getUserByPasswordResetToken(token)
     if (req.body.password && req.body.password_confirmation) {
       const password = req.body.password
       const passwordConfirmation = req.body.password_confirmation
@@ -35,11 +28,8 @@ async function resetPassword (req, res) {
       if (password !== passwordConfirmation) {
         return res.render('password_reset', { appName: process.env.APP_NAME || 'hasura_starters', title: 'Password Reset', token: token, error: 'Passwords did not match!' })
       }
-      if (password.length < 5) {
-        return res.render('password_reset', { appName: process.env.APP_NAME || 'hasura_starters', title: 'Password Reset', token: token, error: 'Password must be at least 5 characters long.' })
-      }
-
-      await updateUserPassword(user.id, password)
+      
+      await EmailPassword.resetPasswordUsingToken(token, password)
 
       res.render('password_reset_success', { appName: process.env.APP_NAME || 'hasura_starters' })
     } else {
@@ -56,15 +46,10 @@ async function verify (req, res) {
     if (!token) {
       return res.render('error', { appName: process.env.APP_NAME || 'hasura_starters', message: 'token is required!' })
     }
-
-    const user = await getUserByEmailVerificationToken(token)
-    if (user) {
-      await verifyUserEmail(user.id)
-      res.render('verify_success', { appName: process.env.APP_NAME || 'hasura_starters' })
-    } else {
-      res.render('error', { appName: process.env.APP_NAME || 'hasura_starters', message: 'Verification token not found!' })
-    }
+    await EmailPassword.verifyEmailUsingToken(token)
+    res.render('verify_success', { appName: process.env.APP_NAME || 'hasura_starters' })
   } catch (error) {
+    console.error(error)
     return res.render('error', { appName: process.env.APP_NAME || 'hasura_starters', error: error.message })
   }
 }
