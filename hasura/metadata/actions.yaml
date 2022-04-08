@@ -19,6 +19,13 @@ actions:
     handler: '{{ACTIONS_BASE_URL}}/login'
   permissions:
   - role: public
+- name: loginRefresh
+  definition:
+    kind: synchronous
+    handler: '{{ACTIONS_BASE_URL}}/loginRefresh'
+  permissions:
+  - role: user
+  - role: public
 - name: register
   definition:
     kind: synchronous

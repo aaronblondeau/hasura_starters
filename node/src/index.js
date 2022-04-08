@@ -3,10 +3,8 @@ const express = require('express')
 const bodyParser = require('body-parser')
 const cors = require('cors')
 const http = require('http')
-const authController = require('./controllers/v1/AuthController')
 const actionsController = require('./controllers/v1/ActionsController')
 const eventsController = require('./controllers/v1/EventsController')
-const webController = require('./controllers/v1/WebController')
 const terminus = require('@godaddy/terminus')
 const path = require('path')
 const { Queue, FlowProducer, QueueScheduler } = require('bullmq')
@@ -49,10 +47,8 @@ app.all('/healthcheck', async (req, res) => {
   res.json({ healthy: true, hasura: hasuraCheck.data })
 })
 
-app.use('/hasura/auth', authController.router)
 app.use('/hasura/actions', actionsController.router)
 app.use('/hasura/events', eventsController.router)
-app.use('/web', webController.router)
 
 const redis = {
   port: parseInt(process.env.REDIS_PORT || '6379'),

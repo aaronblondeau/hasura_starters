@@ -19,6 +19,12 @@ type Mutation {
 }
 
 type Mutation {
+  loginRefresh (
+    refresh_token: String!
+  ): LoginOutput
+}
+
+type Mutation {
   register (
     password: String!
     email: String!
@@ -37,20 +43,28 @@ type Query {
 
 type RegisterOutput {
   id : Int!
-  token : String!
+  access_token : String!
+  expires_at : Int!
+  refresh_expires_in : Int!
+  refresh_token : String!
 }
 
 type WhoamiOutput {
   id : Int!
+  email : String!
+  email_verified : Boolean!
 }
 
 type LoginOutput {
-  token : String!
+  access_token : String!
+  expires_at : Int!
+  refresh_expires_in : Int!
+  refresh_token : String!
   id : Int!
 }
 
 type ChangePasswordOutput {
-  password_at : String!
+  success : Boolean!
 }
 
 type ResetPasswordOutput {

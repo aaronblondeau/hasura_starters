@@ -1,21 +1,15 @@
 const express = require('express')
 const _ = require('lodash')
-const { default: axios } = require('axios')
 const emailValidator = require('email-validator')
-const { generateToken, getUserFromTokenWithPassword, hashPassword, comparePasswords, getUserIdFromToken, getUserByEmail, generateRandomToken, updateUserPassword } = require('../../auth')
+const { decodeToken, getUserIdFromTokenPayload } = require('../../auth')
+const { getKeycloakAdminClient, generateToken, refreshToken } = require('../../keycloak')
 const sendPasswordResetEmailJob = require('../../jobs/v1/send_password_reset_email')
 const sendVerificationEmailJob = require('../../jobs/v1/send_verification_email')
-const { redisCache } = require('../../cache')
-const { DateTime } = require('luxon')
 
 const router = express.Router()
 
 async function register (req, res) {
   try {
-    if (!process.env.JWT_SECRET) {
-      return res.status(500).json({ message: 'Authentication action is not properly configured!' })
-    }
-
     let email = null
     if (_.has(req, 'body.input.email')) {
       email = req.body.input.email
@@ -37,40 +31,56 @@ async function register (req, res) {
     } else {
       return res.status(400).send({ message: 'Password is required.' })
     }
-    if (password.length < 5) {
-      return res.status(400).send({ message: 'Password must be at least 5 characters long.' })
-    }
-    const hashedPassword = await hashPassword(password)
 
-    console.log((process.env.HASURA_BASE_URL || 'http://localhost:8000') + '/v1/graphql', hashedPassword, email)
+    const kcAdminClient = await getKeycloakAdminClient()
 
-    const createUserResponse = await axios.post((process.env.HASURA_BASE_URL || 'http://localhost:8000') + '/v1/graphql', {query: 
-    `
-    mutation CreateUser {
-      insert_users(objects: {email: "${email}", password: "${hashedPassword}"}) {
-        returning {
-          id
-          password
-          password_at
-        }
+    // Create user
+    const newUser = await kcAdminClient.users.create({
+      realm: process.env.KEYCLOAK_REALM || 'hasura_starters',
+      username: email,
+      email,
+      emailVerified: false,
+      enabled: true
+    })
+
+    const userId = newUser.id
+
+    // Set password
+    await kcAdminClient.users.resetPassword({
+      id: userId,
+      credential: {
+        temporary: false,
+        type: 'password',
+        value: password,
       }
-    }
-    `
-    }, {headers: {
-      'x-hasura-admin-secret': process.env.HASURA_GRAPHQL_ADMIN_SECRET
-    }})
-    if (createUserResponse.data.errors) {
-      throw new Error(createUserResponse.data.errors[0].message)
-    }
+    })
 
-    const user = createUserResponse.data.data.insert_users.returning[0]
+    // Assign "user" role within "hasura_staters" client
+    await kcAdminClient.users.addClientRoleMappings({
+      id: userId,
+      clientUniqueId: process.env.KEYCLOAK_CLIENT_ID || 'f73dccbc-a65e-4f1f-930f-8d559754901b',
 
-    // Generate token for user
-    const token = generateToken(user.id, Math.ceil(DateTime.fromISO(user.password_at).toJSDate().getTime() / 1000))
+      // at least id and name should appear
+      roles: [
+        {
+          id: process.env.KEYCLOAK_USER_ROLE_ID || '6bed1cf6-935f-4c4b-a7a4-e2a7eb0c3719',
+          name: 'user',
+        }
+      ]
+    })
 
-    await sendVerificationEmailJob.queue(user)
+    // Send verify email (in a job)
+    await sendVerificationEmailJob.queue({ userId })
+  
+    const tokenSet = await generateToken(email, password)
 
-    return res.send({ id: user.id, token })
+    res.json({
+      access_token: tokenSet.access_token,
+      expires_at: tokenSet.expires_at,
+      refresh_expires_in: tokenSet.refresh_expires_in,
+      refresh_token: tokenSet.refresh_token,
+      id: userId
+    })
   } catch (error) {
     console.error(error)
     return res.status(400).send({ message: error.message + '' })
@@ -79,10 +89,6 @@ async function register (req, res) {
 
 async function login (req, res) {
   try {
-    if (!process.env.JWT_SECRET) {
-      return res.status(500).json({ message: 'Authentication action is not properly configured!' })
-    }
-
     let email = _.has(req, 'body.input.email') ? req.body.input.email : ''
     let password = _.has(req, 'body.input.password') ? req.body.input.password : ''
 
@@ -112,20 +118,17 @@ async function login (req, res) {
       return res.status(401).json({ message: 'Both password and email must be provided!' })
     }
 
-    const user = await getUserByEmail(email)
-    if (user) {
-      const passwordMatches = await comparePasswords(password, user.password)
-      if (!passwordMatches) {
-        return res.status(401).json({ message: 'email or password did not match!' })
-      }
+    const tokenSet = await generateToken(email, password)
+    const decoded = await decodeToken(tokenSet.access_token)
+    const id = getUserIdFromTokenPayload(decoded)
 
-      // User found and password matched - issue token!
-      const token = generateToken(user.id)
-
-      return res.json({ token, id: user.id })
-    } else {
-      return res.status(400).send({ message: 'email not found!' })
-    }
+    res.json({
+      access_token: tokenSet.access_token,
+      expires_at: tokenSet.expires_at,
+      refresh_expires_in: tokenSet.refresh_expires_in,
+      refresh_token: tokenSet.refresh_token,
+      id
+    })
   } catch (error) {
     console.error(error)
     return res.status(400).send({ message: error.message + '' })
@@ -135,9 +138,21 @@ async function login (req, res) {
 async function whoami (req, res) {
   try {
     let token = req.headers.authorization || ''
-    const id = getUserIdFromToken(token)
+    const decoded = decodeToken(token.replace('Bearer ', ''))
+    const id = getUserIdFromTokenPayload(decoded)
     if (id) {
+      // // Profile info is already in token, however, could use following for a test of keycloak accounts api
+      // // Required enabling accounts api : https://www.keycloak.org/server/features
+      // const response = await axios.get((process.env.KEYCLOAK_BASE_URL || 'http://localhost:8080/realms/hasura_starters') + '/account', {
+      //   headers: {
+      //     'Authorization': token
+      //   }
+      // })
+      // console.log(response.data)
+
       return res.send({
+        email: decoded.email,
+        email_verified: decoded.email_verified,
         id
       })
     }
@@ -163,18 +178,31 @@ async function changePassword (req, res) {
     } else {
       return res.status(400).send({ message: 'New password is required.' })
     }
-    if (newPassword.length < 5) {
-      return res.status(400).send({ message: 'New password must be at least 5 characters long.' })
-    }
     
     let token = req.headers.authorization || ''
+    const kcAdminClient = await getKeycloakAdminClient()
 
-    const user = await getUserFromTokenWithPassword(token, oldPassword)
-    if (user) {
-      const updatedUser = await updateUserPassword(user.id, newPassword)
-      return res.send({ password_at: updatedUser.password_at })
+    const decoded = decodeToken(token.replace('Bearer ', ''))
+    const id = getUserIdFromTokenPayload(decoded)
+    if (id) {
+      const tokenSet = await generateToken(decoded.email, oldPassword)
+      // If success, change password
+      if (tokenSet && tokenSet.access_token) {
+        await kcAdminClient.users.resetPassword({
+          id,
+          credential: {
+            temporary: false,
+            type: 'password',
+            value: newPassword,
+          }
+        })
+        return res.send({ success: true })
+      } else {
+        throw new Error('Password did not match')
+      }
+    } else {
+      throw new Error('Invalid session')
     }
-    return res.status(401).json({ message: 'User not found or old password not matched!' })
   } catch (error) {
     console.error(error)
     return res.status(400).send({ message: error.message + '' })
@@ -191,29 +219,23 @@ async function destroyUser (req, res) {
     }
 
     let token = req.headers.authorization || ''
+    const kcAdminClient = await getKeycloakAdminClient()
 
-    const user = await getUserFromTokenWithPassword(token, password)
-    if (user) {
-      await redisCache.del('auth/user/' + user.id)
-      // TODO - must all delete all x-requested-role keys as well!
-
-      const destroyUserResponse = await axios.post((process.env.HASURA_BASE_URL || 'http://localhost:8000') + '/v1/graphql', {query: 
-      `
-      mutation DeleteUser {
-        delete_users_by_pk(id: ${user.id}) {
-          id
-        }
+    const decoded = decodeToken(token.replace('Bearer ', ''))
+    const id = getUserIdFromTokenPayload(decoded)
+    if (id) {
+      const tokenSet = await generateToken(decoded.email, password)
+      // If success, delete
+      if (tokenSet && tokenSet.access_token) {
+        await kcAdminClient.users.del({
+          id,
+        })
+        return res.send({ success: true })
+      } else {
+        throw new Error('Password did not match')
       }
-      `
-      }, {headers: {
-        'x-hasura-admin-secret': process.env.HASURA_GRAPHQL_ADMIN_SECRET
-      }})
-      if (destroyUserResponse.data.errors) {
-        throw new Error(response.data.errors[0].message)
-      }
-      return res.send({ success: true })
     } else {
-      return res.status(401).json({ message: 'Invalid token.  You must be logged in to perform this action!' })
+      throw new Error('Invalid session')
     }
   } catch (error) {
     console.error(error)
@@ -236,32 +258,44 @@ async function resetPassword (req, res) {
       return res.status(400).send({ message: 'Email is invalid!' })
     }
 
-    const user = await getUserByEmail(email)
+    const kcAdminClient = await getKeycloakAdminClient()
 
-    if (user) {
-      const newToken = generateRandomToken()
-      const updateUserResponse = await axios.post((process.env.HASURA_BASE_URL || 'http://localhost:8000') + '/v1/graphql', {query: 
-      `
-      mutation UpdatePasswordResetToken {
-        update_users_by_pk(pk_columns: {id: ${user.id}}, _set: {password_reset_token: "${newToken}"}) {
-          id
-          email
-          password_reset_token
-        }
-      }
-      `
-      }, {headers: {
-        'x-hasura-admin-secret': process.env.HASURA_GRAPHQL_ADMIN_SECRET
-      }})
-      if (updateUserResponse.data.errors) {
-        throw new Error(response.data.errors[0].message)
-      }
+    const found = await kcAdminClient.users.find({email})
+    if (found.length > 0) {
+      const user = found[0]
 
-      await sendPasswordResetEmailJob.queue(updateUserResponse.data.data.update_users_by_pk)
+      await sendPasswordResetEmailJob.queue({ userId: user.id })
+
       return res.send({ success: true })
+    } else {
+      throw new Error('No user found.')
     }
-    
-    return res.status(401).json({ message: 'Invalid email!' })
+  } catch (error) {
+    console.error(error)
+    return res.status(400).send({ message: error.message + '' })
+  }
+}
+
+async function loginRefresh (req, res) {
+  try {
+    let refresh_token = ''
+    if (_.has(req, 'body.input.refresh_token')) {
+      refresh_token = req.body.input.refresh_token
+    } else {
+      return res.status(400).send({ message: 'refresh_token is required.' })
+    }
+
+    const tokenSet = await refreshToken(refresh_token)
+    const decoded = decodeToken(tokenSet.access_token)
+    const id = getUserIdFromTokenPayload(decoded)
+
+    res.json({
+      access_token: tokenSet.access_token,
+      expires_at: tokenSet.expires_at,
+      refresh_expires_in: tokenSet.refresh_expires_in,
+      refresh_token: tokenSet.refresh_token,
+      id
+    })
   } catch (error) {
     console.error(error)
     return res.status(400).send({ message: error.message + '' })
@@ -274,6 +308,7 @@ router.post('/whoami', whoami)
 router.post('/changePassword', changePassword)
 router.post('/destroyUser', destroyUser)
 router.post('/resetPassword', resetPassword)
+router.post('/loginRefresh', loginRefresh)
 
 module.exports = {
   router

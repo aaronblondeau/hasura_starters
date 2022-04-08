@@ -68,7 +68,44 @@ CREATE DATABASE hasura_starters;
 \q
 ```
 
-**2) Start hasura**
+**2) Start keycloak**
+
+```
+LINUX TODO
+```
+
+Windows:
+```
+docker run --rm -d -p 8080:8080 `
+  -e KEYCLOAK_ADMIN=admin `
+  -e KEYCLOAK_ADMIN_PASSWORD=admin `
+  -e KC_FEATURES=account-api `
+  -e KC_DB=postgres `
+  -e KC_DB_PASSWORD=pgadmin `
+  -e KC_DB_USERNAME=postgres `
+  -e KC_DB_URL_HOST=host.docker.internal `
+  -e KC_DB_URL_DATABASE=keycloak `
+  quay.io/keycloak/keycloak:17.0.1 start-dev
+```
+
+Follow instructions here to create realm :
+https://www.keycloak.org/getting-started/getting-started-docker
+
+Then follow instructions here : 
+https://github.com/janhapke/hasura-keycloak
+
+And setup admin for secret token:
+https://www.appsdeveloperblog.com/keycloak-rest-api-create-a-new-user/
+(did confidential step for both master and app realm)
+
+Configure realm's email with mailtrap.io
+
+Create admin user for sub-realm
+Go to user -> role mappings -> client roles = realm-management -> add realm-admin
+
+https://www.marcus-povey.co.uk/2020/10/12/using-the-keycloak-accounts-management-api/
+
+**3) Start hasura**
 
 For mac or windows replace 172.17.0.1 with host.docker.internal
 
@@ -80,7 +117,9 @@ docker run --rm -d -p 8000:8000 \
   -e HASURA_GRAPHQL_DATABASE_URL=postgres://postgres:pgadmin@172.17.0.1:5432/hasura_starters \
   -e HASURA_GRAPHQL_ENABLE_CONSOLE=false \
   -e HASURA_GRAPHQL_ADMIN_SECRET=mydevsecret \
-  -e HASURA_GRAPHQL_AUTH_HOOK=http://172.17.0.1:3000/hasura/auth \
+
+  TODO - KEYCLOAK TOKEN CONFIG
+
   -e ACTIONS_BASE_URL=http://172.17.0.1:3000/hasura/actions \
   -e EVENTS_WEBHOOK_URL=http://172.17.0.1:3000/hasura/events \
   -e HASURA_GRAPHQL_CORS_DOMAIN=* \
@@ -94,20 +133,21 @@ docker run --rm -d -p 8000:8000 `
   -e HASURA_GRAPHQL_DATABASE_URL=postgres://postgres:pgadmin@host.docker.internal:5432/hasura_starters `
   -e HASURA_GRAPHQL_ENABLE_CONSOLE=false `
   -e HASURA_GRAPHQL_ADMIN_SECRET=mydevsecret `
-  -e HASURA_GRAPHQL_AUTH_HOOK=http://host.docker.internal:3000/hasura/auth `
+  -e HASURA_GRAPHQL_JWT_SECRET='{\"type\": \"RS256\", \"key\": \"-----BEGIN CERTIFICATE-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAy6uNXXYcOEsU1m2wj5NkIM4gUh+iufeO66DoylSB/IWUj42yiVRM78prxJPDMah2QKBRbZhPiNKFl1hK2PTw4eKPMMum4zJW0/ZEvtfa+aYgHDWPjhevdjZBo+wkfydNcrv4rC2uMrlCdvxUBegk1RM9GfQKIkl3xGEC5rzz8mjvrO5yEnBLB3TD8TcRoCy+0RZ4WaHhAIR2+jtOq2PxIkMKZ14hCR/m4bri09Bh76v/VRrGVTP+BbBsJbWuacVC/gYxRmuwvnFTdzKPD9l6iw/oKZ7nbYjzQDibeMoJhLuzYHGQ0IeUu5wNccMR2W47j+LMrv1dOZTG22fiAz4YdQIDAQAB\n-----END CERTIFICATE-----\"}' `
+  -e HASURA_GRAPHQL_UNAUTHORIZED_ROLE=public `
   -e ACTIONS_BASE_URL=http://host.docker.internal:3000/hasura/actions `
   -e EVENTS_WEBHOOK_URL=http://host.docker.internal:3000/hasura/events `
   -e HASURA_GRAPHQL_CORS_DOMAIN=* `
   hasura/graphql-engine:latest
 ```
 
-**3) Start redis**
+**4) Start redis**
 
 ```
 docker run --rm --name local-redis -p 6379:6379 -d redis
 ```
 
-**4) Start the Node.js server**
+**5) Start the Node.js server**
 
 This project has only been tested on node 14 and 16.
 
@@ -118,7 +158,7 @@ yarn install
 yarn dev
 ```
 
-**5) start hasura console**
+**6) start hasura console**
 
 The hasura cli was installed via yarn with the commands above.  You may want to [install the cli globally](https://hasura.io/docs/latest/graphql/core/hasura-cli/install-hasura-cli.html).
 
@@ -229,3 +269,9 @@ Set these env var for the node.js environment to point it at your hasura.io
 instance:
 - HASURA_GRAPHQL_ADMIN_SECRET = *Found under "Admin Secret" in dashboard*
 - HASURA_BASE_URL = *Something like https://blah-blah-78.hasura.app*
+
+
+
+
+
+
