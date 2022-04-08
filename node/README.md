@@ -3,7 +3,7 @@
 This repo provides a starter project for creting an API with Hasura and Node.js.
 
 It includes the following
-- User authentication (with JWT tokens)
+- User authentication (with JWT tokens from KeyCloak)
 - User email verification and password resets (emails sent with Mailjet)
 - Kubernetes friendly /readycheck and /healthcheck endpoints
 - Graceful shutdowns (with terminus)
@@ -71,7 +71,16 @@ CREATE DATABASE hasura_starters;
 **2) Start keycloak**
 
 ```
-LINUX TODO
+docker run --rm -d -p 8080:8080 \
+  -e KEYCLOAK_ADMIN=admin \
+  -e KEYCLOAK_ADMIN_PASSWORD=admin \
+  -e KC_FEATURES=account-api \
+  -e KC_DB=postgres \
+  -e KC_DB_PASSWORD=pgadmin \
+  -e KC_DB_USERNAME=postgres \
+  -e KC_DB_URL_HOST=host.docker.internal \
+  -e KC_DB_URL_DATABASE=keycloak \
+  quay.io/keycloak/keycloak:17.0.1 start-dev
 ```
 
 Windows:
@@ -117,9 +126,8 @@ docker run --rm -d -p 8000:8000 \
   -e HASURA_GRAPHQL_DATABASE_URL=postgres://postgres:pgadmin@172.17.0.1:5432/hasura_starters \
   -e HASURA_GRAPHQL_ENABLE_CONSOLE=false \
   -e HASURA_GRAPHQL_ADMIN_SECRET=mydevsecret \
-
-  TODO - KEYCLOAK TOKEN CONFIG
-
+  -e HASURA_GRAPHQL_JWT_SECRET='{\"type\": \"RS256\", \"key\": \"-----BEGIN CERTIFICATE-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAy6uNXXYcOEsU1m2wj5NkIM4gUh+iufeO66DoylSB/IWUj42yiVRM78prxJPDMah2QKBRbZhPiNKFl1hK2PTw4eKPMMum4zJW0/ZEvtfa+aYgHDWPjhevdjZBo+wkfydNcrv4rC2uMrlCdvxUBegk1RM9GfQKIkl3xGEC5rzz8mjvrO5yEnBLB3TD8TcRoCy+0RZ4WaHhAIR2+jtOq2PxIkMKZ14hCR/m4bri09Bh76v/VRrGVTP+BbBsJbWuacVC/gYxRmuwvnFTdzKPD9l6iw/oKZ7nbYjzQDibeMoJhLuzYHGQ0IeUu5wNccMR2W47j+LMrv1dOZTG22fiAz4YdQIDAQAB\n-----END CERTIFICATE-----\"}' \
+  -e HASURA_GRAPHQL_UNAUTHORIZED_ROLE=public \
   -e ACTIONS_BASE_URL=http://172.17.0.1:3000/hasura/actions \
   -e EVENTS_WEBHOOK_URL=http://172.17.0.1:3000/hasura/events \
   -e HASURA_GRAPHQL_CORS_DOMAIN=* \
@@ -224,6 +232,7 @@ Determine id of current user (requires Authorization header)
 query Whoami {
   whoami {
     id
+    email
   }
 }
 ```
@@ -232,7 +241,7 @@ Change password (requires Authorization header)
 ```
 mutation Changepass {
   changePassword(new_password: "supersecret", old_password: "secret") {
-    password_at
+    success
   }
 }
 ```
@@ -269,9 +278,3 @@ Set these env var for the node.js environment to point it at your hasura.io
 instance:
 - HASURA_GRAPHQL_ADMIN_SECRET = *Found under "Admin Secret" in dashboard*
 - HASURA_BASE_URL = *Something like https://blah-blah-78.hasura.app*
-
-
-
-
-
-
