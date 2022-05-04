@@ -218,3 +218,44 @@ This project has a controller setup for custom actions.  If you need to create c
 ## Events
 
 This project has a controller setup for custom events.  You'll most likely want to hand hasura events off to BullMQ for actual processing.  See the jobs folder for examples.  Learn more about events [here](https://hasura.io/docs/latest/graphql/core/event-triggers/index.html).
+
+## Vendor Lock In
+
+It is very straightforward and easy to migrate auth away from firebase.  The steps are
+1) Use auth:export tool to download user data
+2) Transfer user data into database
+3) Use scrypt to hash / verify passwords (firebase-scrypt package)
+
+```javascript
+// https://firebase.google.com/docs/cli/auth
+// firebase auth:export users.json --format=json
+
+// https://www.npmjs.com/package/firebase-scrypt
+import { FirebaseScrypt } from 'firebase-scrypt'
+
+import fs from 'fs-extra'
+
+async function testLogin (email, password) {
+  const users = await fs.readJSON('./users.json')
+  const config = await fs.readJSON('./auth_config.json')
+
+  for (const user of users.users) {
+    if (user.email === email) {
+      const scrypt = new FirebaseScrypt({
+        memCost: config.hash_config.mem_cost,
+        rounds: config.hash_config.rounds,
+        saltSeparator: config.hash_config.base64_salt_separator,
+        signerKey: config.hash_config.base64_signer_key
+      })
+      const isVerified = scrypt.verify(password, user.salt, user.passwordHash)
+      return isVerified
+    }
+  }
+
+  return false
+}
+
+testLogin('email@example.com', 'shhhhhh').then((isVerified) => {
+  console.log(isVerified)
+})
+```
