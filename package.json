@@ -1,0 +1,40 @@
+{
+  "name": "hasura_starters",
+  "version": "1.0.0",
+  "description": "hasura_starters",
+  "main": "src/index.js",
+  "scripts": {
+    "dev": "nodemon ./src/index.js",
+    "start": "node ./src/index.js"
+  },
+  "author": "Your Name <youremail@example.com>",
+  "private": true,
+  "devDependencies": {
+    "eslint": "^7.12.1",
+    "eslint-config-standard": "^16.0.2",
+    "eslint-plugin-import": "^2.22.1",
+    "eslint-plugin-node": "^11.1.0",
+    "eslint-plugin-promise": "^4.2.1",
+    "hasura-cli": "^2.6.0",
+    "nodemon": "^2.0.6"
+  },
+  "dependencies": {
+    "@godaddy/terminus": "^4.5.0",
+    "axios": "^0.21.1",
+    "basic-auth-connect": "^1.0.0",
+    "body-parser": "^1.19.0",
+    "bull-arena": "^3.29.2",
+    "bullmq": "^1.42.1",
+    "cache-manager": "^3.6.1",
+    "cache-manager-ioredis": "^2.1.0",
+    "cors": "^2.8.5",
+    "dotenv": "^10.0.0",
+    "express": "^4.17.1",
+    "firebase-admin": "^10.1.0",
+    "fs-extra": "^10.0.0",
+    "handlebars": "^4.7.7",
+    "lodash": "^4.17.21",
+    "mjml": "^4.10.2",
+    "nodemailer": "^6.7.5"
+  }
+}

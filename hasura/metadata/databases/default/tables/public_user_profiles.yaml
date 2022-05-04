@@ -1,0 +1,35 @@
+table:
+  schema: public
+  name: user_profiles
+configuration:
+  custom_root_fields:
+    insert: insertUserProfiles
+    select_aggregate: userProfilesAggregate
+    insert_one: insertUserProfile
+    select_by_pk: userProfile
+    select: userProfiles
+    delete: deleteUserProfiles
+    update: updateUserProfiles
+    delete_by_pk: deleteUserProfile
+    update_by_pk: updateUserProfile
+  custom_name: userProfiles
+  custom_column_names:
+    display_name: displayName
+select_permissions:
+  - role: user
+    permission:
+      columns:
+        - id
+        - display_name
+      filter:
+        id:
+          _eq: X-Hasura-User-Id
+update_permissions:
+  - role: user
+    permission:
+      columns:
+        - display_name
+      filter:
+        id:
+          _eq: X-Hasura-User-Id
+      check: null

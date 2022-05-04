@@ -1,51 +1,35 @@
 actions:
-- name: changePassword
-  definition:
-    kind: synchronous
-    handler: '{{ACTIONS_BASE_URL}}/changePassword'
-    forward_client_headers: true
-  permissions:
-  - role: user
-- name: destroyUser
-  definition:
-    kind: synchronous
-    handler: '{{ACTIONS_BASE_URL}}/destroyUser'
-    forward_client_headers: true
-  permissions:
-  - role: user
-- name: login
-  definition:
-    kind: synchronous
-    handler: '{{ACTIONS_BASE_URL}}/login'
-  permissions:
-  - role: public
-- name: register
-  definition:
-    kind: synchronous
-    handler: '{{ACTIONS_BASE_URL}}/register'
-  permissions:
-  - role: public
-- name: resetPassword
-  definition:
-    kind: synchronous
-    handler: '{{ACTIONS_BASE_URL}}/resetPassword'
-  permissions:
-  - role: public
-- name: whoami
-  definition:
-    kind: ""
-    handler: '{{ACTIONS_BASE_URL}}/whoami'
-    forward_client_headers: true
-  permissions:
-  - role: user
+  - name: destroyUser
+    definition:
+      kind: synchronous
+      handler: '{{ACTIONS_BASE_URL}}/destroyUser'
+      forward_client_headers: true
+    permissions:
+      - role: user
+  - name: register
+    definition:
+      kind: synchronous
+      handler: '{{ACTIONS_BASE_URL}}/register'
+    permissions:
+      - role: public
+  - name: resetPassword
+    definition:
+      kind: synchronous
+      handler: '{{ACTIONS_BASE_URL}}/resetPassword'
+    permissions:
+      - role: public
+  - name: whoami
+    definition:
+      kind: ""
+      handler: '{{ACTIONS_BASE_URL}}/whoami'
+      forward_client_headers: true
+    permissions:
+      - role: user
 custom_types:
   enums: []
   input_objects: []
   objects:
-  - name: RegisterOutput
-  - name: WhoamiOutput
-  - name: LoginOutput
-  - name: ChangePasswordOutput
-  - name: ResetPasswordOutput
-  - name: DestroyUserOutput
+    - name: WhoamiOutput
+    - name: RegisterOutput
+    - name: SucceedOrFailOutput
   scalars: []

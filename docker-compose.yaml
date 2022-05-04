@@ -1,0 +1,49 @@
+version: '3.6'
+services:
+  traefik:
+    image: "traefik:v2.5"
+    container_name: "traefik"
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:1337"
+    ports:
+      - "1337:1337"
+      - "9090:8080"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+  redis:
+    image: redis
+    restart: always
+    ports:
+      - '6379:6379'
+  postgres:
+    image: postgres
+    restart: always
+    volumes:
+      - ./data/db_firestore:/var/lib/postgresql/data
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-secretpgpassword}
+    ports:
+      - '5432:5432'
+  graphql-engine:
+    image: hasura/graphql-engine:latest
+    depends_on:
+      - 'postgres'
+    restart: always
+    expose:
+      - 8080
+    environment:
+      HASURA_GRAPHQL_DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD:-secretpgpassword}@postgres:5432/postgres
+      HASURA_GRAPHQL_ADMIN_SECRET: ${HASURA_GRAPHQL_ADMIN_SECRET}
+      HASURA_GRAPHQL_LOG_LEVEL: debug
+      HASURA_GRAPHQL_ENABLE_CONSOLE: 'true'
+      HASURA_GRAPHQL_AUTH_HOOK: ${NODE_BASE_URL}/hasura/auth
+      ACTIONS_BASE_URL: ${NODE_BASE_URL}/hasura/actions
+      EVENTS_WEBHOOK_URL: ${NODE_BASE_URL}/hasura/events
+      HASURA_GRAPHQL_CORS_DOMAIN: '*'
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.hasura.rule=Host(`localhost`) && PathPrefix(`/`)"
+      - "traefik.http.routers.hasura.entrypoints=web"

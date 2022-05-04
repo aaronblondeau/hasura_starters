@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/mini.css/3.0.1/mini-default.min.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>hasura_starters</title>
+</head>
+<body>
+  
+  <div x-data>
+
+      <fieldset x-show="!$store.auth.token">
+        <legend>Login</legend>
+        <label for="email">Email</label>
+        <input type="text" id="Email" x-model="$store.auth.email" placeholder="Email"/>
+        <label for="password">Password</label>
+        <input type="password" id="password" x-model="$store.auth.password" placeholder="Password"/>
+      </fieldset>
+      <button x-show="!$store.auth.token" @click="$store.auth.login()" class="primary">Login</button>
+      <button x-show="$store.auth.token" @click="$store.auth.logout()" class="primary">Logout</button>
+
+      <pre x-show="$store.auth.token" x-text="$store.auth.token"></pre>
+  </div>
+  
+  <!-- Insert this script at the bottom of the HTML, but before you use any Firebase services -->
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.7.0/firebase-app.js'
+
+    // Add Firebase products that you want to use
+    import { getAuth, signInWithEmailAndPassword, signOut } from 'https://www.gstatic.com/firebasejs/9.7.0/firebase-auth.js'
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyALqXD-FrotvTHAE_GUmK6y9cArzT4hNFw",
+      authDomain: "fireplacecms.firebaseapp.com",
+      databaseURL: "https://fireplacecms.firebaseio.com",
+      projectId: "fireplacecms",
+      storageBucket: "fireplacecms.appspot.com",
+      messagingSenderId: "529354557790",
+      appId: "1:529354557790:web:2461493368da02634527cf"
+    }
+
+    const app = initializeApp(firebaseConfig)
+    const auth = getAuth()
+
+    auth.onIdTokenChanged((user) => {
+      if (user) {
+        user.getIdToken().then((firebaseToken) => {
+          console.log(firebaseToken)
+          Alpine.store('auth').token = firebaseToken
+        })
+      } else {
+        Alpine.store('auth').token = ''
+      }
+    })
+
+    document.addEventListener('alpine:init', () => {
+      Alpine.store('auth', {
+        email: '',
+        password: '',
+        token: '',
+        login() {
+          signInWithEmailAndPassword(auth, this.email, this.password)
+          .then((userCredential) => {
+            // Signed in 
+            const user = userCredential.user;
+            // ...
+          })
+          .catch((error) => {
+            console.error(error)
+          })
+        },
+        logout() {
+          signOut(auth)
+        }
+      })
+    })
+  </script>
+  <script defer src="https://unpkg.com/alpinejs@3.10.2/dist/cdn.min.js"></script>
+</body>
+</html>
