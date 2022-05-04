@@ -5,6 +5,7 @@ const sendPasswordResetEmailJob = require('../../jobs/v1/send_password_reset_ema
 const sendVerificationEmailJob = require('../../jobs/v1/send_verification_email')
 const createUserProfile = require('../../jobs/v1/create_user_profile')
 const destroyUserProfile = require('../../jobs/v1/destroy_user_profile')
+const { redisCache } = require('../../cache')
 const firebase = require('../../firebase')
 
 const router = express.Router()
@@ -39,7 +40,7 @@ async function register (req, res) {
       })
 
     // Create user profile record in our db
-    await createUserProfile.queue({ uid })
+    await createUserProfile.queue({ uid: user.uid })
 
     // Send verification email
     await sendVerificationEmailJob.queue({ uid: user.uid, email })
@@ -58,8 +59,6 @@ async function whoami (req, res) {
     const decodedToken = await firebase.auth.verifyIdToken(token)
     const { uid } = decodedToken
     const user = await firebase.auth.getUser(uid)
-
-    console.log(user)
 
     const userResponse = await axios.post((process.env.HASURA_BASE_URL || 'http://localhost:8000') + '/v1/graphql', {query: 
     `
@@ -138,6 +137,9 @@ async function destroyUser (req, res) {
   
       // Create job to cleanup after user:
       await destroyUserProfile.queue({ uid })
+
+      // Remove this token from the cache
+      await redisCache.del(token)
   
       return res.send({ success: true })
     } else {
@@ -154,12 +156,90 @@ async function destroyUser (req, res) {
   }
 }
 
+async function updateEmail (req, res) {
+  try {
+    const token = (req.headers.authorization || '').replace('Bearer ', '')
+
+    let password = ''
+    if (_.has(req, 'body.input.password')) {
+      password = req.body.input.password
+    } else {
+      return res.status(400).send({ message: 'password is required.' })
+    }
+
+    let email = null
+    if (_.has(req, 'body.input.email')) {
+      email = req.body.input.email
+    } else {
+      return res.status(400).send({ message: 'New email is required.' })
+    }
+    // Always handle emails in lowercase on the backend
+    email = email.toLowerCase()
+
+    const decodedToken = await firebase.auth.verifyIdToken(token)
+    const { uid } = decodedToken
+    const user = await firebase.auth.getUser(uid)
+
+    // verify password
+    // https://cloud.google.com/identity-platform/docs/use-rest-api#section-sign-in-email-password
+    // https://stackoverflow.com/questions/52523367/firebase-admin-sdk-check-users-password-against-variable-on-server
+    const passwordCheckResult = await axios.post(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${process.env.FIREBASE_API_KEY}`, {
+      email: user.email,
+      password
+    })
+
+    if (passwordCheckResult.data.idToken) {
+      // Note, if users manage to call updateEmail from within the browser, emailVerified will get set to false
+      // but the email job won't get triggered here.  Users in this condition will need to use resendEmailValidate.
+      await firebase.auth.updateUser(uid, {
+        email,
+        emailVerified: false
+      })
+
+      await sendVerificationEmailJob.queue({ uid: user.uid, email })
+
+      // Remove this token from the cache
+      await redisCache.del(token)
+
+      return res.send({ success: true })
+    } else {
+      return res.status(400).send({ message: 'Password did not match!' })
+    }
+  } catch (error) {
+    console.error(error)
+    if (error.response) {
+      // Axios error => password failed
+      return res.status(400).send({ message: 'Password did not match!' })
+    } else {
+      return res.status(400).send({ message: error.message + '' })
+    }
+  }
+}
+
+async function resendEmailValidate (req, res) {
+  try {
+    const token = (req.headers.authorization || '').replace('Bearer ', '')
+
+    const decodedToken = await firebase.auth.verifyIdToken(token)
+    const { uid } = decodedToken
+    const user = await firebase.auth.getUser(uid)
+
+    // NOTE : User will see a message from firebase saying "You can now sign in with your NEW account" - may cause user confusion.
+    await sendVerificationEmailJob.queue({ email: user.email })
+
+    return res.send({ success: true })
+  } catch (error) {
+    console.error(error)
+    return res.status(400).send({ message: error.message + '' })
+  }
+}
+
 router.post('/register', register)
 router.post('/whoami', whoami)
 router.post('/resetPassword', resetPassword)
 router.post('/destroyUser', destroyUser)
-
-// TODO - action for email change (that validates) : https://firebase.google.com/docs/auth/web/manage-users#set_a_users_email_address
+router.post('/updateEmail', updateEmail)
+router.post('/resendEmailValidate', resendEmailValidate)
 
 module.exports = {
   router

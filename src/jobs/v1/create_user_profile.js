@@ -45,7 +45,7 @@ async function execute (payload) {
   const createUserResponse = await axios.post((process.env.HASURA_BASE_URL || 'http://localhost:8000') + '/v1/graphql', {query: 
   `
   mutation CreateProfile {
-    insertUserProfile(object: {id: "${user.uid}", displayName: ""}) {
+    insertUserProfile(object: {id: "${uid}", displayName: ""}) {
       id
     }
   }

@@ -5,6 +5,7 @@ actions:
       handler: '{{ACTIONS_BASE_URL}}/destroyUser'
       forward_client_headers: true
     permissions:
+      - role: verified-user
       - role: user
   - name: register
     definition:
@@ -12,18 +13,34 @@ actions:
       handler: '{{ACTIONS_BASE_URL}}/register'
     permissions:
       - role: public
+  - name: resendEmailValidate
+    definition:
+      kind: synchronous
+      handler: '{{ACTIONS_BASE_URL}}/resendEmailValidate'
+      forward_client_headers: true
+    permissions:
+      - role: user
   - name: resetPassword
     definition:
       kind: synchronous
       handler: '{{ACTIONS_BASE_URL}}/resetPassword'
     permissions:
       - role: public
+  - name: updateEmail
+    definition:
+      kind: synchronous
+      handler: '{{ACTIONS_BASE_URL}}/updateEmail'
+      forward_client_headers: true
+    permissions:
+      - role: user
+      - role: verified-user
   - name: whoami
     definition:
       kind: ""
       handler: '{{ACTIONS_BASE_URL}}/whoami'
       forward_client_headers: true
     permissions:
+      - role: verified-user
       - role: user
 custom_types:
   enums: []

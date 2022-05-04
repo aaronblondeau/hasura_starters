@@ -24,8 +24,16 @@ select_permissions:
       filter:
         id:
           _eq: X-Hasura-User-Id
+  - role: verified-user
+    permission:
+      columns:
+        - display_name
+        - id
+      filter:
+        id:
+          _eq: X-Hasura-User-Id
 update_permissions:
-  - role: user
+  - role: verified-user
     permission:
       columns:
         - display_name

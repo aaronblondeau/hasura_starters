@@ -46,18 +46,16 @@ async function hasuraAuth (request, response) {
       return
     }
 
-    // Check if user has validated their email
-    const user = await firebase.auth.getUser(uid)
-    if (!user.emailVerified) {
-      response.status(401).json({ error: 'email not verified' })
-      // Don't cache this
-      return
-    }
-
     // Has uid => at least user role
-    const role = 'user'
+    let role = 'user'
 
-    // TODO - perform other firestore or graphql queries necessary to determine user's role
+    // Perform other firestore or graphql queries necessary to determine user's role here
+
+    // Check if user has verified their email
+    const user = await firebase.auth.getUser(uid)
+    if (user.emailVerified) {
+      role = 'verified-user'
+    }
 
     const responseData = {
       'X-Hasura-Role': role,

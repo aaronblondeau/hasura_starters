@@ -12,8 +12,19 @@ type Mutation {
 }
 
 type Mutation {
+  resendEmailValidate: SucceedOrFailOutput
+}
+
+type Mutation {
   resetPassword(
     email: String!
+  ): SucceedOrFailOutput
+}
+
+type Mutation {
+  updateEmail(
+    email: String!
+    password: String!
   ): SucceedOrFailOutput
 }
 

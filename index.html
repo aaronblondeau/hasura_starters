@@ -21,6 +21,8 @@
       <button x-show="!$store.auth.token" @click="$store.auth.login()" class="primary">Login</button>
       <button x-show="$store.auth.token" @click="$store.auth.logout()" class="primary">Logout</button>
 
+      <button @click="$store.auth.dev()" class="primary">Dev</button>
+
       <pre x-show="$store.auth.token" x-text="$store.auth.token"></pre>
   </div>
   
@@ -29,7 +31,7 @@
     import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.7.0/firebase-app.js'
 
     // Add Firebase products that you want to use
-    import { getAuth, signInWithEmailAndPassword, signOut } from 'https://www.gstatic.com/firebasejs/9.7.0/firebase-auth.js'
+    import { getAuth, signInWithEmailAndPassword, signOut, updateEmail } from 'https://www.gstatic.com/firebasejs/9.7.0/firebase-auth.js'
 
     const firebaseConfig = {
       apiKey: "AIzaSyALqXD-FrotvTHAE_GUmK6y9cArzT4hNFw",
@@ -47,11 +49,12 @@
     auth.onIdTokenChanged((user) => {
       if (user) {
         user.getIdToken().then((firebaseToken) => {
-          console.log(firebaseToken)
           Alpine.store('auth').token = firebaseToken
+          Alpine.store('auth').user = user
         })
       } else {
         Alpine.store('auth').token = ''
+        Alpine.store('auth').user = null
       }
     })
 
@@ -60,6 +63,15 @@
         email: '',
         password: '',
         token: '',
+        user: null,
+        dev() {
+          // Make sure we can't change our email to another users...
+          updateEmail(this.user, 'test@example.com').then(() => {
+            console.log('Email changed!')
+          }).catch((error) => {
+            console.error('Email change failed', error)
+          })
+        },
         login() {
           signInWithEmailAndPassword(auth, this.email, this.password)
           .then((userCredential) => {
