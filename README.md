@@ -1,13 +1,5 @@
 # hasura_starters - Node
 
-
-TODO - docker-compose up -d
-docker-compose down
-
-
-
-
-
 This repo provides a starter project for creting an API with Hasura and Node.js.
 
 It includes the following
@@ -23,140 +15,134 @@ This project does not provide a user interface other than for user authenticatio
 
 Before using this project you'll want to search for the text "hasura_starters" and replace those strings with your app's name.
 
-You must set the following environment variables before running the Node.js server:
-- HASURA_GRAPHQL_ADMIN_SECRET
-- JWT_SECRET
-- ARENA_PASS
+# Development Environment Setup
 
-For development you can copy .env.example to .env.
+A [firebase](https://firebase.google.com/) is required.
 
-This project runs postgres, hasura, and redis in docker containers.  The commands below include "--rm" so that they are easy to re-run. If you have problems with the container, remove the "--rm" so that you can use these commands to troubleshoot:
+For development you will need to copy .env.example to .env.  Then fill in the details for all the FIREBASE_ variables.  The values for these variables can all be found on the General tab within firebase project settings.
 
-```
-docker ps -a
-docker logs <container id>
-```
+You will need to create a directory at the root of this project called service_accounts.  Then you will need to obtain a .json service account credentials file from Project Settings > Service Accounts in firebase.  Place the .json file within the service_accounts folder.
 
-# Developing
+The FIREBASE_SERVICE_ACCOUNT environment variable should contain the name of the service account file.
 
 You will need docker and nodejs (with yarn) installed on your machine.
 
-**1) Start postgres and create database**
+The easiest way to get docker is to install docker desktop : https://www.docker.com/products/docker-desktop/
 
-Create a directory on your machine for storing the postgres database.  Then, replace "~/Volumes/hasura_starters" in the command below with the path to your directory.
+Node.js is available here : https://nodejs.org/en/
 
-*Note, this uses postgres with postgis.  Replace "postgis/postgis" with "postgres" to use plain postgres.*
-
-```
-docker run --rm -d \
-  --name local-postgres \
-  -p 5432:5432 \
-  -e POSTGRES_PASSWORD=pgadmin \
-  -e PGDATA=/var/lib/postgresql/data/pgdata \
-  -v ~/Volumes/hasura_starters:/var/lib/postgresql/data \
-  postgis/postgis
-```
-
-On Windows:
-```
-docker run --rm -d `
-  --name postgres `
-  -p 5432:5432 `
-  -e POSTGRES_PASSWORD=pgadmin `
-  -e PGDATA=/var/lib/postgresql/data/pgdata `
-  -v C:\Users\ablon\Volumes\hasura_starters:/var/lib/postgresql/data `
-  postgis/postgis
-```
-
-Next connect to postgres and create a database:
+Once Node.js is installed, add [yarn](https://yarnpkg.com/) by running:
 
 ```
-psql -h localhost -U postgres
-CREATE DATABASE hasura_starters;
-\q
+npm install -g yarn
 ```
 
-**2) Start hasura**
+If using windows you will need to run the following command in order to allow yarn to run commands.  Please research the implications of this command for the security of your system before running it:
 
-For mac or windows replace 172.17.0.1 with host.docker.internal
-
-Note, HASURA_GRAPHQL_ENABLE_CONSOLE is set to false because you will need to run the hasura console from the cli in order to capture metadata and migrations as you create them.  **You must manually run the console for it to track your changes - see step 5 below!**
-
-```
-docker run --rm -d -p 8000:8000 \
-  -e HASURA_GRAPHQL_SERVER_PORT=8000 \
-  -e HASURA_GRAPHQL_DATABASE_URL=postgres://postgres:pgadmin@172.17.0.1:5432/hasura_starters \
-  -e HASURA_GRAPHQL_ENABLE_CONSOLE=false \
-  -e HASURA_GRAPHQL_ADMIN_SECRET=mydevsecret \
-  -e HASURA_GRAPHQL_AUTH_HOOK=http://172.17.0.1:3000/hasura/auth \
-  -e ACTIONS_BASE_URL=http://172.17.0.1:3000/hasura/actions \
-  -e EVENTS_WEBHOOK_URL=http://172.17.0.1:3000/hasura/events \
-  -e HASURA_GRAPHQL_CORS_DOMAIN=* \
-  hasura/graphql-engine:latest
+```powershell
+Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy Bypass
 ```
 
-On Windows:
+You will need a (free) mailtrap.io account in order to receive emails sent by the development environment.  Create one here : https://mailtrap.io/.  Then grab your mailtrap SMTP username and password from the "SMTP Settings" tab within mailtrap.
+
+Within the new .env file, configure the AUTH_SMTP_USER and AUTH_SMTP_PASS settings to point to your mailtrap.io account.
+
+Note, if you are on a linux machine you will also need to change all occurrences of "host.docker.internal" within the .env file to "172.17.0.1".  For example:
 ```
-docker run --rm -d -p 8000:8000 `
-  -e HASURA_GRAPHQL_SERVER_PORT=8000 `
-  -e HASURA_GRAPHQL_DATABASE_URL=postgres://postgres:pgadmin@host.docker.internal:5432/hasura_starters `
-  -e HASURA_GRAPHQL_ENABLE_CONSOLE=false `
-  -e HASURA_GRAPHQL_ADMIN_SECRET=mydevsecret `
-  -e HASURA_GRAPHQL_AUTH_HOOK=http://host.docker.internal:3000/hasura/auth `
-  -e ACTIONS_BASE_URL=http://host.docker.internal:3000/hasura/actions `
-  -e EVENTS_WEBHOOK_URL=http://host.docker.internal:3000/hasura/events `
-  -e HASURA_GRAPHQL_CORS_DOMAIN=* `
-  hasura/graphql-engine:latest
+NODE_BASE_URL=http://172.17.0.1:3000
 ```
 
-**3) Start redis**
-
+With the .env file ready to go, launch the backend hasura stack with docker compose
 ```
-docker run --rm --name local-redis -p 6379:6379 -d redis
+docker-compose up -d
 ```
 
-**4) Start the Node.js server**
+Several services are started by docker-compose:
+- Traefik (reverse proxy) will be at : http://localhost:9090/
+- Postgres will be running on port 5432 (username = postgres, password is set by POSTGRES_PASSWORD value in .env)
+- Hasura api will be at : http://localhost:1337/
+- Hasura console will also be at : http://localhost:1337/ (**do not use this console instance to make database migration or metadata updates!**)
 
-This project has only been tested on node 14 and 16.
-
+Next, run the Node.js server with:
 ```
-cd node
-nvm use 16
 yarn install
 yarn dev
 ```
 
-**5) start hasura console**
+The Node.js server provides custom graphql actions, performs background tasks such as sending emails, and responds to hasura events.
 
-The hasura cli was installed via yarn with the commands above.  You may want to [install the cli globally](https://hasura.io/docs/latest/graphql/core/hasura-cli/install-hasura-cli.html).
+Then, run these commands to sync the latest database migrations and hasura metadata into the postgres database:
 
-
-Run these commands once to bootstrap the database and hasura metadata:
-
-```
-cd node
+For Mac/Linux, run:
+```bash
 export HASURA_GRAPHQL_ADMIN_SECRET=mydevsecret
-yarn hasura migrate apply --project ../hasura
-yarn hasura metadata apply --project ../hasura
+yarn hasura migrate apply --project ./hasura
+yarn hasura metadata apply --project ./hasura
 ```
 
-Then run the console for day to day development:
-
-``` Console Startup
-cd node
-export HASURA_GRAPHQL_ADMIN_SECRET=mydevsecret
-yarn hasura console --project ../hasura
-```
-
-On windows:
-
-```Windows
-cd node
+For Windows, run:
+```powershell
 $env:HASURA_GRAPHQL_ADMIN_SECRET = 'mydevsecret'
-yarn hasura console --project ../hasura
+yarn hasura migrate apply --project ./hasura
+yarn hasura metadata apply --project ./hasura
 ```
 
-Note, If developing in a container or on a remote host you will likely want to have VSCode forward ports : 3000, 8000, 9695, 9693
+## Day to Day Development
+
+Start the backend stack:
+```
+docker-compose up -d
+```
+
+Launch the node.js server
+```
+yarn dev
+```
+
+Then run the following commands to ensure hasura's database and metadata is up to date.
+*These "migrate apply" and "metadata apply" commands can be skipped if there are no new changes to sync.*
+
+For Linux/Max OS, Use:
+```bash
+export HASURA_GRAPHQL_ADMIN_SECRET=mydevsecret
+yarn hasura migrate apply --project ./hasura
+yarn hasura metadata apply --project ./hasura
+```
+
+For Windows Use:
+```powershell
+$env:HASURA_GRAPHQL_ADMIN_SECRET = 'mydevsecret'
+yarn hasura migrate apply --project ./hasura
+yarn hasura metadata apply --project ./hasura
+```
+
+To run the hasura console locally in developer mode (migrations and metadata get saved to the ./hasura folder):
+
+For Mac/Linux, Use:
+```bash
+export HASURA_GRAPHQL_ADMIN_SECRET=mydevsecret
+yarn hasura console --project ./hasura
+```
+
+For Windows Use:
+```powershell
+$env:HASURA_GRAPHQL_ADMIN_SECRET = 'mydevsecret'
+yarn hasura console --project ./hasura
+```
+
+The console will be available at http://localhost:9695/
+
+Stop docker with
+```
+docker-compose down
+```
+
+Note, If developing in a container or on a remote host you will likely want to have VSCode forward ports : 
+- 3030 : Node.js
+- 9090 : Traefik
+- 9695 : Hasura Console (Development)
+- 9693 : Hasura Console (Development)
+- 1337 : Hasura
 
 ## GraphQL examples
 
@@ -167,9 +153,9 @@ Try these queries in the Hasura console.  You'll want to un-check the "x-hasura-
 To execute queries from your frontend app, I recommend using a combo of [graphql-request](https://www.npmjs.com/package/graphql-request) and [graphql-ws](https://www.npmjs.com/package/graphql-ws).  I strongly suggest you avoid using the apollo graphql client as I found it extraordinarly overengineered and frustrating to use.  A NuxtJS plugin for using the packages above can be found in the repo at [./docs/graphql.js](./docs/graphql.js).
 
 Register
-```
+```graphql
 mutation Register {
-  register(email: "foo@bar.com", password: "foobar1!!") {
+  register(email: "foo@bar.com", password: "secret") {
     id
   }
 }
@@ -177,21 +163,49 @@ mutation Register {
 
 Note, login and password changes should be performed with firebase directly.
 
-Determine id of current user (requires Authorization header)
-```
+Determine info about of current user (requires Authorization header)
+```graphql
 query Whoami {
   whoami {
+    displayName
+    email
+    emailVerified
     id
   }
 }
 ```
 
-TODO - change email
+Change email
+```graphql
+mutation UpdateEmail {
+  updateEmail(email: "newaddress@example.com", password: "secret") {
+    success
+  }
+}
+```
 
 Request password reset
-```
+```graphql
 mutation RequestPasswordReset {
   resetPassword(email: "somebody@example.com") {
+    success
+  }
+}
+```
+
+Resend email validation
+```graphql
+mutation ResendEmailValidation {
+  resendEmailValidate {
+    success
+  }
+}
+```
+
+Destroy user
+```graphql
+mutation DestroyUser {
+  destroyUser(password: "secret") {
     success
   }
 }
@@ -204,19 +218,3 @@ This project has a controller setup for custom actions.  If you need to create c
 ## Events
 
 This project has a controller setup for custom events.  You'll most likely want to hand hasura events off to BullMQ for actual processing.  See the jobs folder for examples.  Learn more about events [here](https://hasura.io/docs/latest/graphql/core/event-triggers/index.html).
-
-## Deploying on hasura.io
-
-Set these env vars in your hasura.io console to use a running instance of this node.js server (see examples in docker command in step 2 above):
-- HASURA_GRAPHQL_AUTH_HOOK
-- ACTIONS_BASE_URL
-- EVENTS_WEBHOOK_URL
-
-Here is an example of setting HASURA_GRAPHQL_AUTH_HOOK in the hasura.io dashboard:
-
-![Hasura Env Var Example](./docs/hasura_io_env_var.jpg)
-
-Set these env var for the node.js environment to point it at your hasura.io 
-instance:
-- HASURA_GRAPHQL_ADMIN_SECRET = *Found under "Admin Secret" in dashboard*
-- HASURA_BASE_URL = *Something like https://blah-blah-78.hasura.app*
