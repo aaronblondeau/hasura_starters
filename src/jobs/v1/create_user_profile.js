@@ -42,17 +42,20 @@ async function execute (payload) {
   const uid = payload.uid
 
   // Create user profile record (using our own db instead of firebase)
-  const createUserResponse = await axios.post((process.env.HASURA_BASE_URL || 'http://localhost:8000') + '/v1/graphql', {query: 
-  `
-  mutation CreateProfile {
-    insertUserProfile(object: {id: "${uid}", displayName: ""}) {
-      id
+  const createUserResponse = await axios.post((process.env.HASURA_BASE_URL || 'http://localhost:8000') + '/v1/graphql', {
+    query:
+    `
+    mutation CreateProfile {
+      insertUserProfile(object: {id: "${uid}", displayName: ""}) {
+        id
+      }
     }
-  }
-  `
-  }, {headers: {
-    'x-hasura-admin-secret': process.env.HASURA_GRAPHQL_ADMIN_SECRET
-  }})
+    `
+  }, {
+    headers: {
+      'x-hasura-admin-secret': process.env.HASURA_GRAPHQL_ADMIN_SECRET
+    }
+  })
   if (createUserResponse.data.errors) {
     throw new Error(createUserResponse.data.errors[0].message)
   }

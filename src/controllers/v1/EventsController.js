@@ -1,7 +1,6 @@
 const express = require('express')
 const router = express.Router()
 
-
 async function handleEvent (req, res) {
   try {
     console.log('~~ event!', req.body.trigger.name, req.method)

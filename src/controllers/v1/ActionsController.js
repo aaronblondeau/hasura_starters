@@ -33,11 +33,11 @@ async function register (req, res) {
 
     // Create the user in firebase
     const user = await firebase.auth.createUser({
-        email,
-        emailVerified: false,
-        password,
-        disabled: false,
-      })
+      email,
+      emailVerified: false,
+      password,
+      disabled: false
+    })
 
     // Create user profile record in our db
     await createUserProfile.queue({ uid: user.uid })
@@ -60,19 +60,22 @@ async function whoami (req, res) {
     const { uid } = decodedToken
     const user = await firebase.auth.getUser(uid)
 
-    const userResponse = await axios.post((process.env.HASURA_BASE_URL || 'http://localhost:8000') + '/v1/graphql', {query: 
-    `
-    query GetUserProfile {
-      userProfile(id: "${uid}") {
-        displayName
+    const userResponse = await axios.post((process.env.HASURA_BASE_URL || 'http://localhost:8000') + '/v1/graphql', {
+      query:
+      `
+      query GetUserProfile {
+        userProfile(id: "${uid}") {
+          displayName
+        }
       }
-    }
-    `
-    }, {headers: {
-      'x-hasura-admin-secret': process.env.HASURA_GRAPHQL_ADMIN_SECRET
-    }})
+      `
+    }, {
+      headers: {
+        'x-hasura-admin-secret': process.env.HASURA_GRAPHQL_ADMIN_SECRET
+      }
+    })
     if (userResponse.data.errors) {
-      throw new Error(response.data.errors[0].message)
+      throw new Error(userResponse.data.errors[0].message)
     }
 
     if (user) {
@@ -134,13 +137,13 @@ async function destroyUser (req, res) {
 
     if (passwordCheckResult.data.idToken) {
       await firebase.auth.deleteUser(uid)
-  
+
       // Create job to cleanup after user:
       await destroyUserProfile.queue({ uid })
 
       // Remove this token from the cache
       await redisCache.del(token)
-  
+
       return res.send({ success: true })
     } else {
       return res.status(400).send({ message: 'Password did not match!' })

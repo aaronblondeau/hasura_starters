@@ -1,4 +1,4 @@
-const nodemailer = require("nodemailer")
+const nodemailer = require('nodemailer')
 
 const transporter = nodemailer.createTransport({
   host: process.env.AUTH_SMTP_HOST,
@@ -11,15 +11,15 @@ const transporter = nodemailer.createTransport({
 })
 
 async function sendEmail (email, subject, textMessage, htmlMessage) {
-  let info = await transporter.sendMail({
+  const info = await transporter.sendMail({
     from: process.env.EMAIL_SENDER,
     to: email,
     subject: subject,
     text: textMessage,
-    html: htmlMessage,
-  });
+    html: htmlMessage
+  })
 
-  console.log("~~ email sent: %s", info.messageId);
+  console.log('~~ email sent: %s', info.messageId)
 }
 
 module.exports = sendEmail

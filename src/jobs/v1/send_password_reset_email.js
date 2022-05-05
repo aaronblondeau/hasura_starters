@@ -44,7 +44,7 @@ worker.on('failed', (job, err) => {
 
 async function execute (payload) {
   const email = payload.email
-  
+
   // https://firebase.google.com/docs/auth/admin/email-action-links#generate_password_reset_email_link
   // TODO - send second param "actionCodeSettings" to set redirect url, app handling, etc...
   const resetPasswordUrl = await firebase.auth.generatePasswordResetLink(email)
